@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface EmpathyMapData {
   dores: string;
@@ -11,8 +12,11 @@ interface EmpathyMapData {
   objecoes: string;
 }
 
+const DEBOUNCE_MS = 1000;
+
 export const useEmpathyMapState = () => {
   const { toast } = useToast();
+  const { organization } = useAuth();
   const [empathyMap, setEmpathyMap] = useState<EmpathyMapData>({
     dores: "",
     ganhos: "",
@@ -23,23 +27,20 @@ export const useEmpathyMapState = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [sessionId, setSessionId] = useState<string>("");
+  const [recordId, setRecordId] = useState<string | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
-    const loadEmpathyMap = async () => {
-      let storedSessionId = localStorage.getItem("trinity_session_id");
-      
-      if (!storedSessionId) {
-        storedSessionId = crypto.randomUUID();
-        localStorage.setItem("trinity_session_id", storedSessionId);
-      }
-      
-      setSessionId(storedSessionId);
+    if (!organization?.id) {
+      setIsLoading(false);
+      return;
+    }
 
+    const loadEmpathyMap = async () => {
       const { data, error } = await supabase
         .from("empathy_map")
         .select("*")
-        .eq("session_id", storedSessionId)
+        .eq("organization_id", organization.id)
         .maybeSingle();
 
       if (error && error.code !== "PGRST116") {
@@ -52,6 +53,7 @@ export const useEmpathyMapState = () => {
       }
 
       if (data) {
+        setRecordId(data.id);
         setEmpathyMap({
           dores: data.dores || "",
           ganhos: data.ganhos || "",
@@ -61,20 +63,25 @@ export const useEmpathyMapState = () => {
           objecoes: data.objecoes || "",
         });
       } else {
-        const { error: insertError } = await supabase
+        const { data: newRecord, error: insertError } = await supabase
           .from("empathy_map")
-          .insert({
-            session_id: storedSessionId,
+          .insert([{
+            organization_id: organization.id,
+            session_id: organization.id,
             dores: "",
             ganhos: "",
             necessidades: "",
             pensamentos: "",
             sentimentos: "",
             objecoes: "",
-          });
+          }])
+          .select()
+          .single();
 
         if (insertError) {
           console.error("Error creating empathy map:", insertError);
+        } else if (newRecord) {
+          setRecordId(newRecord.id);
         }
       }
 
@@ -82,11 +89,11 @@ export const useEmpathyMapState = () => {
     };
 
     loadEmpathyMap();
-  }, [toast]);
+  }, [organization?.id, toast]);
 
   const saveEmpathyMap = useCallback(
     async (updatedMap: EmpathyMapData) => {
-      if (!sessionId) return;
+      if (!recordId) return;
 
       setIsSaving(true);
 
@@ -100,7 +107,7 @@ export const useEmpathyMapState = () => {
           sentimentos: updatedMap.sentimentos,
           objecoes: updatedMap.objecoes,
         })
-        .eq("session_id", sessionId);
+        .eq("id", recordId);
 
       if (error) {
         console.error("Error saving empathy map:", error);
@@ -113,21 +120,26 @@ export const useEmpathyMapState = () => {
 
       setIsSaving(false);
     },
-    [sessionId, toast]
+    [recordId, toast]
   );
 
-  let saveTimeout: NodeJS.Timeout;
   const updateField = useCallback(
     (field: keyof EmpathyMapData, value: string) => {
-      const updatedMap = { ...empathyMap, [field]: value };
-      setEmpathyMap(updatedMap);
+      setEmpathyMap((prev) => {
+        const updated = { ...prev, [field]: value };
 
-      clearTimeout(saveTimeout);
-      saveTimeout = setTimeout(() => {
-        saveEmpathyMap(updatedMap);
-      }, 1000);
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+        }
+
+        saveTimeoutRef.current = setTimeout(() => {
+          saveEmpathyMap(updated);
+        }, DEBOUNCE_MS);
+
+        return updated;
+      });
     },
-    [empathyMap, saveEmpathyMap]
+    [saveEmpathyMap]
   );
 
   return {

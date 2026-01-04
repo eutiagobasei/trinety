@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { useDiagnosticState } from "@/hooks/useDiagnosticState";
+import { useAuth } from "@/contexts/AuthContext";
 import { Loader2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -117,7 +118,8 @@ const questionBlocks = [
 export default function Diagnostico() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { answers, updateAnswer, completeDiagnostic, isLoading, isSaving, sessionId } = useDiagnosticState();
+  const { answers, updateAnswer, completeDiagnostic, isLoading, isSaving } = useDiagnosticState();
+  const { organization } = useAuth();
 
   const [currentBlock, setCurrentBlock] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -161,10 +163,10 @@ export default function Diagnostico() {
   };
 
   const finalizeDiagnostic = async () => {
-    if (!sessionId) {
+    if (!organization?.id) {
       toast({
         title: "Erro",
-        description: "Sessão não encontrada. Por favor, recarregue a página.",
+        description: "Organização não encontrada. Por favor, recarregue a página.",
         variant: "destructive"
       });
       return;
@@ -175,13 +177,13 @@ export default function Diagnostico() {
     
     await completeDiagnostic();
     
-    console.log('Calling generate-strategic-plan with session_id:', sessionId);
+    console.log('Calling generate-strategic-plan with organization_id:', organization.id);
 
     setGenerationStep("Gerando planejamento estratégico com IA...");
     
     try {
       const { data, error } = await supabase.functions.invoke('generate-strategic-plan', {
-        body: { session_id: sessionId }
+        body: { organization_id: organization.id }
       });
 
       if (error) {

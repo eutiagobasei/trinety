@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface SwotState {
   forcas: string;
@@ -10,8 +11,11 @@ interface SwotState {
   combinacoes: string;
 }
 
+const DEBOUNCE_MS = 1000;
+
 export const useSwotState = () => {
   const { toast } = useToast();
+  const { organization } = useAuth();
   const [swot, setSwot] = useState<SwotState>({
     forcas: "",
     fraquezas: "",
@@ -21,32 +25,27 @@ export const useSwotState = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [recordId, setRecordId] = useState<string | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Get or create session ID
-  const getSessionId = useCallback(() => {
-    let sessionId = localStorage.getItem("trinity_session_id");
-    if (!sessionId) {
-      sessionId = crypto.randomUUID();
-      localStorage.setItem("trinity_session_id", sessionId);
-    }
-    return sessionId;
-  }, []);
-
-  // Load existing data
   useEffect(() => {
+    if (!organization?.id) {
+      setIsLoading(false);
+      return;
+    }
+
     const loadSwot = async () => {
       try {
-        const sessionId = getSessionId();
         const { data, error } = await supabase
           .from("swot_analysis")
           .select("*")
-          .eq("session_id", sessionId)
+          .eq("organization_id", organization.id)
           .maybeSingle();
 
         if (error) throw error;
 
         if (data) {
+          setRecordId(data.id);
           setSwot({
             forcas: data.forcas || "",
             fraquezas: data.fraquezas || "",
@@ -68,20 +67,21 @@ export const useSwotState = () => {
     };
 
     loadSwot();
-  }, [getSessionId, toast]);
+  }, [organization?.id, toast]);
 
-  // Save to database with debounce
   const saveToDatabase = useCallback(
     async (data: SwotState) => {
+      if (!organization?.id) return;
+
       try {
         setIsSaving(true);
-        const sessionId = getSessionId();
 
         const { error } = await supabase
           .from("swot_analysis")
           .upsert(
             {
-              session_id: sessionId,
+              organization_id: organization.id,
+              session_id: organization.id,
               forcas: data.forcas,
               fraquezas: data.fraquezas,
               oportunidades: data.oportunidades,
@@ -90,7 +90,7 @@ export const useSwotState = () => {
               updated_at: new Date().toISOString(),
             },
             {
-              onConflict: "session_id",
+              onConflict: "organization_id",
             }
           );
 
@@ -106,28 +106,26 @@ export const useSwotState = () => {
         setIsSaving(false);
       }
     },
-    [getSessionId, toast]
+    [organization?.id, toast]
   );
 
-  // Update state and trigger debounced save
   const updateSwot = useCallback(
     (field: keyof SwotState, value: string) => {
-      const newSwot = { ...swot, [field]: value };
-      setSwot(newSwot);
+      setSwot((prev) => {
+        const newSwot = { ...prev, [field]: value };
 
-      // Clear existing timeout
-      if (saveTimeout) {
-        clearTimeout(saveTimeout);
-      }
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+        }
 
-      // Set new timeout for debounced save (1 second)
-      const timeout = setTimeout(() => {
-        saveToDatabase(newSwot);
-      }, 1000);
+        saveTimeoutRef.current = setTimeout(() => {
+          saveToDatabase(newSwot);
+        }, DEBOUNCE_MS);
 
-      setSaveTimeout(timeout);
+        return newSwot;
+      });
     },
-    [swot, saveTimeout, saveToDatabase]
+    [saveToDatabase]
   );
 
   return {

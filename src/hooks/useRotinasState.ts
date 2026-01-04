@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface Rotinas {
   semanal: string;
@@ -19,23 +20,21 @@ export const useRotinasState = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
-
-  const getSessionId = useCallback(() => {
-    let sessionId = localStorage.getItem("trinity_session_id");
-    if (!sessionId) {
-      sessionId = crypto.randomUUID();
-      localStorage.setItem("trinity_session_id", sessionId);
-    }
-    return sessionId;
-  }, []);
+  const { organization } = useAuth();
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  const isInitialLoad = useRef(true);
 
   const loadRotinas = useCallback(async () => {
+    if (!organization?.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const sessionId = getSessionId();
       const { data, error } = await supabase
         .from("management_routines")
         .select("*")
-        .eq("session_id", sessionId)
+        .eq("organization_id", organization.id)
         .maybeSingle();
 
       if (error) throw error;
@@ -57,45 +56,32 @@ export const useRotinasState = () => {
       });
     } finally {
       setLoading(false);
+      isInitialLoad.current = false;
     }
-  }, [getSessionId, toast]);
+  }, [organization?.id, toast]);
 
   const saveRotinas = useCallback(async (rotinasToSave: Rotinas) => {
+    if (!organization?.id) return;
+
     setSaving(true);
     try {
-      const sessionId = getSessionId();
-
-      const { data: existing } = await supabase
+      const { error } = await supabase
         .from("management_routines")
-        .select("id")
-        .eq("session_id", sessionId)
-        .maybeSingle();
-
-      if (existing) {
-        const { error } = await supabase
-          .from("management_routines")
-          .update({
+        .upsert(
+          {
+            organization_id: organization.id,
+            session_id: organization.id,
             semanal: rotinasToSave.semanal,
             mensal: rotinasToSave.mensal,
             trimestral: rotinasToSave.trimestral,
             anual: rotinasToSave.anual,
-          })
-          .eq("session_id", sessionId);
+          },
+          {
+            onConflict: "organization_id",
+          }
+        );
 
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("management_routines")
-          .insert({
-            session_id: sessionId,
-            semanal: rotinasToSave.semanal,
-            mensal: rotinasToSave.mensal,
-            trimestral: rotinasToSave.trimestral,
-            anual: rotinasToSave.anual,
-          });
-
-        if (error) throw error;
-      }
+      if (error) throw error;
     } catch (error) {
       console.error("Error saving rotinas:", error);
       toast({
@@ -106,7 +92,7 @@ export const useRotinasState = () => {
     } finally {
       setSaving(false);
     }
-  }, [getSessionId, toast]);
+  }, [organization?.id, toast]);
 
   useEffect(() => {
     loadRotinas();
@@ -117,13 +103,21 @@ export const useRotinasState = () => {
   }, []);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || isInitialLoad.current) return;
     
-    const timeoutId = setTimeout(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
       saveRotinas(rotinas);
     }, 1000);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
   }, [rotinas, loading, saveRotinas]);
 
   return {

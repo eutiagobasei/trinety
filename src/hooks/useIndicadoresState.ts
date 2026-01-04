@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface Indicator {
   id?: string;
@@ -18,23 +19,21 @@ export const useIndicadoresState = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
-
-  const getSessionId = useCallback(() => {
-    let sessionId = localStorage.getItem("trinity_session_id");
-    if (!sessionId) {
-      sessionId = crypto.randomUUID();
-      localStorage.setItem("trinity_session_id", sessionId);
-    }
-    return sessionId;
-  }, []);
+  const { organization } = useAuth();
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  const isInitialLoad = useRef(true);
 
   const loadIndicators = useCallback(async () => {
+    if (!organization?.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const sessionId = getSessionId();
       const { data, error } = await supabase
         .from("indicators")
         .select("*")
-        .eq("session_id", sessionId)
+        .eq("organization_id", organization.id)
         .order("created_at", { ascending: true });
 
       if (error) throw error;
@@ -58,17 +57,17 @@ export const useIndicadoresState = () => {
       });
     } finally {
       setLoading(false);
+      isInitialLoad.current = false;
     }
-  }, [getSessionId, toast]);
+  }, [organization?.id, toast]);
 
   const saveIndicators = useCallback(async (indicatorsToSave: Indicator[]) => {
+    if (!organization?.id) return;
+
     setSaving(true);
     try {
-      const sessionId = getSessionId();
-
       for (const indicator of indicatorsToSave) {
         if (indicator.id) {
-          // Update existing
           const { error } = await supabase
             .from("indicators")
             .update({
@@ -82,17 +81,17 @@ export const useIndicadoresState = () => {
 
           if (error) throw error;
         } else if (indicator.nome || indicator.descricao || indicator.meta || indicator.origem || indicator.mensal) {
-          // Insert new (only if has content)
           const { data, error } = await supabase
             .from("indicators")
-            .insert({
-              session_id: sessionId,
+            .insert([{
+              organization_id: organization.id,
+              session_id: organization.id,
               nome: indicator.nome,
               descricao: indicator.descricao,
               meta: indicator.meta,
               origem: indicator.origem,
               mensal: indicator.mensal,
-            })
+            }])
             .select()
             .single();
 
@@ -110,7 +109,7 @@ export const useIndicadoresState = () => {
     } finally {
       setSaving(false);
     }
-  }, [getSessionId, toast]);
+  }, [organization?.id, toast]);
 
   useEffect(() => {
     loadIndicators();
@@ -129,13 +128,21 @@ export const useIndicadoresState = () => {
   }, []);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || isInitialLoad.current) return;
     
-    const timeoutId = setTimeout(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
       saveIndicators(indicators);
     }, 1000);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
   }, [indicators, loading, saveIndicators]);
 
   return {

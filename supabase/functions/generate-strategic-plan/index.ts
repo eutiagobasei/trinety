@@ -111,13 +111,13 @@ serve(async (req) => {
   }
 
   try {
-    const { session_id } = await req.json();
+    const { organization_id } = await req.json();
     
-    if (!session_id) {
-      throw new Error('session_id is required');
+    if (!organization_id) {
+      throw new Error('organization_id is required');
     }
 
-    console.log('Starting strategic plan generation for session:', session_id);
+    console.log('Starting strategic plan generation for organization:', organization_id);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -127,7 +127,7 @@ serve(async (req) => {
     const { data: diagnostic, error: diagnosticError } = await supabase
       .from('diagnostics')
       .select('id')
-      .eq('session_id', session_id)
+      .eq('organization_id', organization_id)
       .maybeSingle();
 
     if (diagnosticError || !diagnostic) {
@@ -447,72 +447,79 @@ Responda EXATAMENTE neste formato JSON (sem markdown, apenas o JSON puro):
       };
     }
 
-    // Save all generated content
+    // Save all generated content using organization_id
     console.log('Saving Business Model Canvas...');
     await supabase
       .from('business_model_canvas')
       .upsert({
-        session_id,
+        organization_id,
+        session_id: organization_id,
         ...canvasData,
         updated_at: new Date().toISOString()
-      }, { onConflict: 'session_id' });
+      }, { onConflict: 'organization_id' });
 
     console.log('Saving Empathy Map...');
     await supabase
       .from('empathy_map')
       .upsert({
-        session_id,
+        organization_id,
+        session_id: organization_id,
         ...empathyData,
         updated_at: new Date().toISOString()
-      }, { onConflict: 'session_id' });
+      }, { onConflict: 'organization_id' });
 
     console.log('Saving SWOT Analysis...');
     await supabase
       .from('swot_analysis')
       .upsert({
-        session_id,
+        organization_id,
+        session_id: organization_id,
         ...swotData,
         updated_at: new Date().toISOString()
-      }, { onConflict: 'session_id' });
+      }, { onConflict: 'organization_id' });
 
     console.log('Saving Philosophy...');
     await supabase
       .from('filosofia')
       .upsert({
-        session_id,
+        organization_id,
+        session_id: organization_id,
         ...filosofiaData,
         updated_at: new Date().toISOString()
-      }, { onConflict: 'session_id' });
+      }, { onConflict: 'organization_id' });
 
     console.log('Saving OKRs...');
     await supabase
       .from('okrs')
       .upsert({
-        session_id,
+        organization_id,
+        session_id: organization_id,
         ...okrsData,
         updated_at: new Date().toISOString()
-      }, { onConflict: 'session_id' });
+      }, { onConflict: 'organization_id' });
 
     console.log('Saving Management Routines...');
     await supabase
       .from('management_routines')
       .upsert({
-        session_id,
+        organization_id,
+        session_id: organization_id,
         ...routinesData,
         updated_at: new Date().toISOString()
-      }, { onConflict: 'session_id' });
+      }, { onConflict: 'organization_id' });
 
     console.log('Saving Indicators...');
-    // Delete existing indicators for this session before inserting new ones
+    // Delete existing indicators for this organization before inserting new ones
     await supabase
       .from('indicators')
       .delete()
-      .eq('session_id', session_id);
+      .eq('organization_id', organization_id);
     
     // Insert new indicators
     if (indicatorsData.indicators && indicatorsData.indicators.length > 0) {
       const indicatorsToInsert = indicatorsData.indicators.map(ind => ({
-        session_id,
+        organization_id,
+        session_id: organization_id,
         nome: ind.nome,
         descricao: ind.descricao,
         meta: ind.meta,
@@ -523,16 +530,17 @@ Responda EXATAMENTE neste formato JSON (sem markdown, apenas o JSON puro):
     }
 
     console.log('Saving Action Plan...');
-    // Delete existing actions for this session before inserting new ones
+    // Delete existing actions for this organization before inserting new ones
     await supabase
       .from('action_plan')
       .delete()
-      .eq('session_id', session_id);
+      .eq('organization_id', organization_id);
     
     // Insert new actions
     if (actionPlanData.actions && actionPlanData.actions.length > 0) {
       const actionsToInsert = actionPlanData.actions.map(action => ({
-        session_id,
+        organization_id,
+        session_id: organization_id,
         acao: action.acao,
         responsavel: action.responsavel,
         prazo: action.prazo,
