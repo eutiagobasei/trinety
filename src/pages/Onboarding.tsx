@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Building2, Users } from "lucide-react";
+import { Loader2, Building2, Users, ArrowLeft } from "lucide-react";
 import trinityLogo from "@/assets/trinity-logo.png";
 
 export default function Onboarding() {
@@ -16,21 +16,17 @@ export default function Onboarding() {
   const [companyName, setCompanyName] = useState("");
   const [companyCode, setCompanyCode] = useState("");
   
-  const { user, organization, refreshProfile } = useAuth();
+  const { user, organizations, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  // Redirect if already has organization
-  if (organization) {
-    navigate("/dashboard", { replace: true });
-    return null;
-  }
 
   // Redirect if not logged in
   if (!user) {
     navigate("/auth", { replace: true });
     return null;
   }
+
+  const hasOrganizations = organizations.length > 0;
 
   const handleCreateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,20 +52,25 @@ export default function Onboarding() {
 
       if (orgError) throw orgError;
 
-      // Update user profile with organization
+      // Create user_organization entry with owner role
+      const { error: userOrgError } = await supabase
+        .from("user_organizations")
+        .insert({
+          user_id: user.id,
+          organization_id: orgData.id,
+          role: "admin",
+          is_owner: true
+        });
+
+      if (userOrgError) throw userOrgError;
+
+      // Set as active organization
       const { error: profileError } = await supabase
         .from("profiles")
-        .update({ organization_id: orgData.id })
+        .update({ active_organization_id: orgData.id })
         .eq("id", user.id);
 
       if (profileError) throw profileError;
-
-      // Assign admin role to creator
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({ user_id: user.id, role: "admin" });
-
-      if (roleError) throw roleError;
 
       // Create default permissions for all modules
       const modules = [
@@ -159,20 +160,37 @@ export default function Onboarding() {
         return;
       }
 
-      // Update user profile with organization
+      // Check if user already belongs to this organization
+      const existingOrg = organizations.find(o => o.organization_id === orgData.id);
+      if (existingOrg) {
+        toast({
+          title: "Já é membro",
+          description: "Você já pertence a esta empresa.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Create user_organization entry
+      const { error: userOrgError } = await supabase
+        .from("user_organizations")
+        .insert({
+          user_id: user.id,
+          organization_id: orgData.id,
+          role: "usuario",
+          is_owner: false
+        });
+
+      if (userOrgError) throw userOrgError;
+
+      // Set as active organization
       const { error: profileError } = await supabase
         .from("profiles")
-        .update({ organization_id: orgData.id })
+        .update({ active_organization_id: orgData.id })
         .eq("id", user.id);
 
       if (profileError) throw profileError;
-
-      // Assign default user role
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({ user_id: user.id, role: "usuario" });
-
-      if (roleError) throw roleError;
 
       await refreshProfile();
 
@@ -198,12 +216,28 @@ export default function Onboarding() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
+          {hasOrganizations && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute left-4 top-4"
+              onClick={() => navigate("/dashboard")}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Voltar
+            </Button>
+          )}
           <div className="mx-auto mb-4">
             <img src={trinityLogo} alt="Trinity Hub" className="h-16 w-auto" />
           </div>
-          <CardTitle className="text-2xl">Bem-vindo ao Trinity Hub!</CardTitle>
+          <CardTitle className="text-2xl">
+            {hasOrganizations ? "Adicionar Empresa" : "Bem-vindo ao Trinity Hub!"}
+          </CardTitle>
           <CardDescription>
-            Crie uma nova empresa ou entre em uma existente
+            {hasOrganizations 
+              ? "Crie uma nova empresa ou entre em uma existente"
+              : "Crie sua primeira empresa ou entre em uma existente"
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
