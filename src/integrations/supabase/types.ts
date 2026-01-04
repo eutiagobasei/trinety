@@ -811,6 +811,10 @@ export type Database = {
         Returns: Database["public"]["Enums"]["app_role"]
       }
       get_user_organization: { Args: { _user_id: string }; Returns: string }
+      get_user_organization_ids: {
+        Args: { _user_id: string }
+        Returns: string[]
+      }
       get_user_subscription: {
         Args: { _user_id: string }
         Returns: {
@@ -837,6 +841,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_organization_owner: {
+        Args: { _org_id: string; _user_id: string }
         Returns: boolean
       }
       is_system_admin: { Args: { _user_id: string }; Returns: boolean }
