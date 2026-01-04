@@ -1,8 +1,19 @@
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
-import trinityLogo from "@/assets/trinity-logo.png";
+
+import Header from "@/components/landing/Header";
+import HeroSection from "@/components/landing/HeroSection";
+import PainPointsSection from "@/components/landing/PainPointsSection";
+import FeaturesSection from "@/components/landing/FeaturesSection";
+import HowItWorksSection from "@/components/landing/HowItWorksSection";
+import TestimonialsSection from "@/components/landing/TestimonialsSection";
+import OfferSection from "@/components/landing/OfferSection";
+import GuaranteeSection from "@/components/landing/GuaranteeSection";
+import FAQSection from "@/components/landing/FAQSection";
+import CTASection from "@/components/landing/CTASection";
+import UrgencyBanner from "@/components/landing/UrgencyBanner";
+import Footer from "@/components/landing/Footer";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -18,23 +29,36 @@ const Index = () => {
     }
   }, [user, organization, isLoading, navigate]);
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center max-w-2xl px-6">
-        <div className="mx-auto mb-6">
-          <img src={trinityLogo} alt="Trinity Hub" className="h-20 w-auto mx-auto" />
-        </div>
-        <h1 className="mb-4 text-5xl font-bold text-primary">Trinity Hub</h1>
-        <p className="text-xl text-muted-foreground mb-8">
-          Plataforma de Criação de Planejamento Estratégico
-        </p>
-        <p className="text-foreground mb-8">
-          Crie e gerencie seu planejamento estratégico de forma estruturada e eficiente.
-        </p>
-        <Button size="lg" onClick={() => navigate("/auth")}>
-          Acessar Plataforma
-        </Button>
+  // Show nothing while checking auth to avoid flash
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="animate-pulse text-muted-foreground">Carregando...</div>
       </div>
+    );
+  }
+
+  // If user is logged in, they'll be redirected, so show nothing
+  if (user) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main>
+        <HeroSection />
+        <PainPointsSection />
+        <FeaturesSection />
+        <HowItWorksSection />
+        <TestimonialsSection />
+        <OfferSection />
+        <GuaranteeSection />
+        <FAQSection />
+        <CTASection />
+        <UrgencyBanner />
+      </main>
+      <Footer />
     </div>
   );
 };
