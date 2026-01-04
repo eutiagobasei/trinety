@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface OkrsState {
   objetivo: string;
@@ -16,24 +17,20 @@ export const useOkrsState = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
-
-  const getSessionId = useCallback(() => {
-    let sessionId = localStorage.getItem("trinity_session_id");
-    if (!sessionId) {
-      sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-      localStorage.setItem("trinity_session_id", sessionId);
-    }
-    return sessionId;
-  }, []);
+  const { organization } = useAuth();
 
   useEffect(() => {
+    if (!organization?.id) {
+      setIsLoading(false);
+      return;
+    }
+
     const loadOkrs = async () => {
       try {
-        const sessionId = getSessionId();
         const { data, error } = await supabase
           .from("okrs")
           .select("*")
-          .eq("session_id", sessionId)
+          .eq("organization_id", organization.id)
           .maybeSingle();
 
         if (error) throw error;
@@ -57,40 +54,31 @@ export const useOkrsState = () => {
     };
 
     loadOkrs();
-  }, [getSessionId, toast]);
+  }, [organization?.id, toast]);
 
   const saveOkrs = useCallback(
     async (newOkrs: OkrsState) => {
+      if (!organization?.id) return;
+
       try {
         setIsSaving(true);
-        const sessionId = getSessionId();
 
-        const { data: existing } = await supabase
+        const { error } = await supabase
           .from("okrs")
-          .select("id")
-          .eq("session_id", sessionId)
-          .maybeSingle();
-
-        if (existing) {
-          const { error } = await supabase
-            .from("okrs")
-            .update({
+          .upsert(
+            {
+              organization_id: organization.id,
+              session_id: organization.id,
               objetivo: newOkrs.objetivo,
               krs: newOkrs.krs,
               updated_at: new Date().toISOString(),
-            })
-            .eq("session_id", sessionId);
+            },
+            {
+              onConflict: "organization_id",
+            }
+          );
 
-          if (error) throw error;
-        } else {
-          const { error } = await supabase.from("okrs").insert({
-            session_id: sessionId,
-            objetivo: newOkrs.objetivo,
-            krs: newOkrs.krs,
-          });
-
-          if (error) throw error;
-        }
+        if (error) throw error;
       } catch (error) {
         console.error("Error saving OKRs:", error);
         toast({
@@ -102,7 +90,7 @@ export const useOkrsState = () => {
         setIsSaving(false);
       }
     },
-    [getSessionId, toast]
+    [organization?.id, toast]
   );
 
   const updateOkrs = useCallback(

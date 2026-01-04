@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const DEBOUNCE_MS = 1000;
 
@@ -18,7 +19,6 @@ export interface CanvasData {
 
 export const useCanvasState = () => {
   const [canvasId, setCanvasId] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string>("");
   const [canvas, setCanvas] = useState<CanvasData>({
     segmentos: "",
     proposta: "",
@@ -34,26 +34,20 @@ export const useCanvasState = () => {
   const [isSaving, setIsSaving] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
+  const { organization } = useAuth();
 
-  // Initialize or load existing canvas
   useEffect(() => {
+    if (!organization?.id) {
+      setIsLoading(false);
+      return;
+    }
+
     const initCanvas = async () => {
       try {
-        // Get or create session ID
-        let storedSessionId = localStorage.getItem("diagnostic_session_id");
-        
-        if (!storedSessionId) {
-          storedSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          localStorage.setItem("diagnostic_session_id", storedSessionId);
-        }
-        
-        setSessionId(storedSessionId);
-
-        // Try to load existing canvas
         const { data: existingCanvas, error: fetchError } = await supabase
           .from("business_model_canvas")
           .select("*")
-          .eq("session_id", storedSessionId)
+          .eq("organization_id", organization.id)
           .maybeSingle();
 
         if (fetchError) {
@@ -62,7 +56,6 @@ export const useCanvasState = () => {
         }
 
         if (existingCanvas) {
-          // Load existing canvas
           setCanvasId(existingCanvas.id);
           setCanvas({
             segmentos: existingCanvas.segmentos || "",
@@ -76,10 +69,12 @@ export const useCanvasState = () => {
             receitas: existingCanvas.receitas || ""
           });
         } else {
-          // Create new canvas
           const { data: newCanvas, error: createError } = await supabase
             .from("business_model_canvas")
-            .insert({ session_id: storedSessionId })
+            .insert([{ 
+              organization_id: organization.id,
+              session_id: organization.id 
+            }])
             .select()
             .single();
 
@@ -103,9 +98,8 @@ export const useCanvasState = () => {
     };
 
     initCanvas();
-  }, [toast]);
+  }, [organization?.id, toast]);
 
-  // Auto-save canvas to database
   const saveCanvas = useCallback(
     async (updatedCanvas: CanvasData) => {
       if (!canvasId) return;
@@ -136,19 +130,15 @@ export const useCanvasState = () => {
     [canvasId, toast]
   );
 
-  // Update field with debounced auto-save
   const updateField = useCallback(
     (field: keyof CanvasData, value: string) => {
-      // Update local state immediately
       setCanvas((prev) => {
         const updated = { ...prev, [field]: value };
         
-        // Clear previous timeout
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
         }
 
-        // Set new timeout for auto-save
         saveTimeoutRef.current = setTimeout(() => {
           saveCanvas(updated);
         }, DEBOUNCE_MS);

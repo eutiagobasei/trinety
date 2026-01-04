@@ -3,8 +3,11 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
-import Login from "./pages/Login";
+import Auth from "./pages/Auth";
+import Onboarding from "./pages/Onboarding";
 import Diagnostico from "./pages/Diagnostico";
 import Dashboard from "./pages/Dashboard";
 import ModeloDeNegocio from "./pages/ModeloDeNegocio";
@@ -25,22 +28,95 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/diagnostico" element={<Diagnostico />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/modelo-de-negocio" element={<ModeloDeNegocio />} />
-          <Route path="/mapa-de-empatia" element={<MapaDeEmpatia />} />
-          <Route path="/filosofia" element={<Filosofia />} />
-          <Route path="/swot" element={<Swot />} />
-          <Route path="/okrs" element={<Okrs />} />
-          <Route path="/indicadores" element={<Indicadores />} />
-          <Route path="/plano-de-acao" element={<PlanoDeAcao />} />
-          <Route path="/rotinas" element={<Rotinas />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            <Route
+              path="/diagnostico"
+              element={
+                <ProtectedRoute>
+                  <Diagnostico />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/modelo-de-negocio"
+              element={
+                <ProtectedRoute>
+                  <ModeloDeNegocio />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mapa-de-empatia"
+              element={
+                <ProtectedRoute>
+                  <MapaDeEmpatia />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/filosofia"
+              element={
+                <ProtectedRoute>
+                  <Filosofia />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/swot"
+              element={
+                <ProtectedRoute>
+                  <Swot />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/okrs"
+              element={
+                <ProtectedRoute>
+                  <Okrs />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/indicadores"
+              element={
+                <ProtectedRoute>
+                  <Indicadores />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/plano-de-acao"
+              element={
+                <ProtectedRoute>
+                  <PlanoDeAcao />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/rotinas"
+              element={
+                <ProtectedRoute>
+                  <Rotinas />
+                </ProtectedRoute>
+              }
+            />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

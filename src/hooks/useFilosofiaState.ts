@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface FilosofiaState {
   visao: string;
@@ -18,75 +19,67 @@ export const useFilosofiaState = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
-
-  const getSessionId = () => {
-    let sessionId = localStorage.getItem("trinity_session_id");
-    if (!sessionId) {
-      sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem("trinity_session_id", sessionId);
-    }
-    return sessionId;
-  };
+  const { organization } = useAuth();
 
   useEffect(() => {
-    loadFilosofia();
-  }, []);
-
-  const loadFilosofia = async () => {
-    try {
-      const sessionId = getSessionId();
-      const { data, error } = await supabase
-        .from("filosofia")
-        .select("*")
-        .eq("session_id", sessionId)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data) {
-        setFilosofia({
-          visao: data.visao || "",
-          missao: data.missao || "",
-          valores: data.valores || "",
-        });
-      }
-    } catch (error) {
-      console.error("Error loading filosofia:", error);
-      toast({
-        title: "Erro ao carregar dados",
-        description: "Não foi possível carregar a filosofia.",
-        variant: "destructive",
-      });
-    } finally {
+    if (!organization?.id) {
       setIsLoading(false);
+      return;
     }
-  };
 
-  const saveFilosofia = async (data: FilosofiaState) => {
+    const loadFilosofia = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("filosofia")
+          .select("*")
+          .eq("organization_id", organization.id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+          setFilosofia({
+            visao: data.visao || "",
+            missao: data.missao || "",
+            valores: data.valores || "",
+          });
+        }
+      } catch (error) {
+        console.error("Error loading filosofia:", error);
+        toast({
+          title: "Erro ao carregar dados",
+          description: "Não foi possível carregar a filosofia.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadFilosofia();
+  }, [organization?.id, toast]);
+
+  const saveFilosofia = useCallback(async (data: FilosofiaState) => {
+    if (!organization?.id) return;
+
     try {
       setIsSaving(true);
-      const sessionId = getSessionId();
 
-      const { data: existing } = await supabase
+      const { error } = await supabase
         .from("filosofia")
-        .select("id")
-        .eq("session_id", sessionId)
-        .maybeSingle();
+        .upsert(
+          {
+            organization_id: organization.id,
+            session_id: organization.id,
+            ...data,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "organization_id",
+          }
+        );
 
-      if (existing) {
-        const { error } = await supabase
-          .from("filosofia")
-          .update(data)
-          .eq("session_id", sessionId);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("filosofia")
-          .insert([{ ...data, session_id: sessionId }]);
-
-        if (error) throw error;
-      }
+      if (error) throw error;
     } catch (error) {
       console.error("Error saving filosofia:", error);
       toast({
@@ -97,7 +90,7 @@ export const useFilosofiaState = () => {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [organization?.id, toast]);
 
   const updateFilosofia = useCallback((field: keyof FilosofiaState, value: string) => {
     setFilosofia((prev) => {
@@ -115,7 +108,7 @@ export const useFilosofiaState = () => {
 
       return newState;
     });
-  }, [saveTimeout]);
+  }, [saveTimeout, saveFilosofia]);
 
   return {
     filosofia,

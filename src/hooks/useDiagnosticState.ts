@@ -1,49 +1,41 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
-const DEBOUNCE_MS = 1000; // Auto-save after 1 second of inactivity
+const DEBOUNCE_MS = 1000;
 
 export const useDiagnosticState = () => {
   const [diagnosticId, setDiagnosticId] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string>("");
   const [answers, setAnswers] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
+  const { organization } = useAuth();
 
-  // Initialize or load existing diagnostic session
   useEffect(() => {
+    if (!organization?.id) {
+      setIsLoading(false);
+      return;
+    }
+
     const initDiagnostic = async () => {
       try {
-        // Get or create session ID
-        let storedSessionId = localStorage.getItem("diagnostic_session_id");
-        
-        if (!storedSessionId) {
-          storedSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          localStorage.setItem("diagnostic_session_id", storedSessionId);
-        }
-        
-        setSessionId(storedSessionId);
-
-        // Try to load existing diagnostic
         const { data: existingDiagnostic, error: fetchError } = await supabase
           .from("diagnostics")
           .select("id")
-          .eq("session_id", storedSessionId)
-          .single();
+          .eq("organization_id", organization.id)
+          .maybeSingle();
 
-        if (fetchError && fetchError.code !== "PGRST116") {
+        if (fetchError) {
           console.error("Error fetching diagnostic:", fetchError);
           throw fetchError;
         }
 
         if (existingDiagnostic) {
-          // Load existing diagnostic
           setDiagnosticId(existingDiagnostic.id);
           
-          // Load answers
           const { data: answersData, error: answersError } = await supabase
             .from("diagnostic_answers")
             .select("*")
@@ -54,7 +46,6 @@ export const useDiagnosticState = () => {
             throw answersError;
           }
 
-          // Convert to answers object
           const loadedAnswers: { [key: string]: string } = {};
           answersData?.forEach((answer) => {
             const key = `${answer.block_index}-${answer.question_index}`;
@@ -63,13 +54,12 @@ export const useDiagnosticState = () => {
           
           setAnswers(loadedAnswers);
         } else {
-          // Create new diagnostic using upsert to avoid duplicate key errors
           const { data: newDiagnostic, error: createError } = await supabase
             .from("diagnostics")
-            .upsert(
-              { session_id: storedSessionId },
-              { onConflict: "session_id" }
-            )
+            .insert([{ 
+              organization_id: organization.id,
+              session_id: organization.id 
+            }])
             .select()
             .single();
 
@@ -93,12 +83,11 @@ export const useDiagnosticState = () => {
     };
 
     initDiagnostic();
-  }, [toast]);
+  }, [organization?.id, toast]);
 
-  // Auto-save answer to database
   const saveAnswer = useCallback(
     async (blockIndex: number, questionIndex: number, answer: string) => {
-      if (!diagnosticId) return;
+      if (!diagnosticId || !organization?.id) return;
 
       try {
         setIsSaving(true);
@@ -108,6 +97,7 @@ export const useDiagnosticState = () => {
           .upsert(
             {
               diagnostic_id: diagnosticId,
+              organization_id: organization.id,
               block_index: blockIndex,
               question_index: questionIndex,
               answer: answer,
@@ -132,23 +122,19 @@ export const useDiagnosticState = () => {
         setIsSaving(false);
       }
     },
-    [diagnosticId, toast]
+    [diagnosticId, organization?.id, toast]
   );
 
-  // Update answer with debounced auto-save
   const updateAnswer = useCallback(
     (blockIndex: number, questionIndex: number, value: string) => {
       const key = `${blockIndex}-${questionIndex}`;
       
-      // Update local state immediately
       setAnswers((prev) => ({ ...prev, [key]: value }));
 
-      // Clear previous timeout
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
 
-      // Set new timeout for auto-save
       saveTimeoutRef.current = setTimeout(() => {
         saveAnswer(blockIndex, questionIndex, value);
       }, DEBOUNCE_MS);
@@ -156,7 +142,6 @@ export const useDiagnosticState = () => {
     [saveAnswer]
   );
 
-  // Mark diagnostic as completed
   const completeDiagnostic = useCallback(async () => {
     if (!diagnosticId) return;
 
@@ -180,7 +165,6 @@ export const useDiagnosticState = () => {
     }
   }, [diagnosticId, toast]);
 
-  // Calculate progress
   const calculateProgress = useCallback((totalQuestions: number) => {
     const answeredCount = Object.values(answers).filter(
       (answer) => answer && answer.trim().length > 0
@@ -195,6 +179,5 @@ export const useDiagnosticState = () => {
     calculateProgress,
     isLoading,
     isSaving,
-    sessionId,
   };
 };

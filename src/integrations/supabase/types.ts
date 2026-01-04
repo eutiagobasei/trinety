@@ -20,6 +20,7 @@ export type Database = {
           created_at: string
           id: string
           obs: string | null
+          organization_id: string | null
           origem: string | null
           prazo: string | null
           responsavel: string | null
@@ -32,6 +33,7 @@ export type Database = {
           created_at?: string
           id?: string
           obs?: string | null
+          organization_id?: string | null
           origem?: string | null
           prazo?: string | null
           responsavel?: string | null
@@ -44,6 +46,7 @@ export type Database = {
           created_at?: string
           id?: string
           obs?: string | null
+          organization_id?: string | null
           origem?: string | null
           prazo?: string | null
           responsavel?: string | null
@@ -51,7 +54,15 @@ export type Database = {
           status?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "action_plan_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       business_model_canvas: {
         Row: {
@@ -60,6 +71,7 @@ export type Database = {
           created_at: string
           custos: string | null
           id: string
+          organization_id: string | null
           parceiros: string | null
           proposta: string | null
           receitas: string | null
@@ -75,6 +87,7 @@ export type Database = {
           created_at?: string
           custos?: string | null
           id?: string
+          organization_id?: string | null
           parceiros?: string | null
           proposta?: string | null
           receitas?: string | null
@@ -90,6 +103,7 @@ export type Database = {
           created_at?: string
           custos?: string | null
           id?: string
+          organization_id?: string | null
           parceiros?: string | null
           proposta?: string | null
           receitas?: string | null
@@ -99,7 +113,15 @@ export type Database = {
           session_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "business_model_canvas_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       diagnostic_answers: {
         Row: {
@@ -108,6 +130,7 @@ export type Database = {
           created_at: string
           diagnostic_id: string
           id: string
+          organization_id: string | null
           question_index: number
           updated_at: string
         }
@@ -117,6 +140,7 @@ export type Database = {
           created_at?: string
           diagnostic_id: string
           id?: string
+          organization_id?: string | null
           question_index: number
           updated_at?: string
         }
@@ -126,6 +150,7 @@ export type Database = {
           created_at?: string
           diagnostic_id?: string
           id?: string
+          organization_id?: string | null
           question_index?: number
           updated_at?: string
         }
@@ -137,6 +162,13 @@ export type Database = {
             referencedRelation: "diagnostics"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "diagnostic_answers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       diagnostics: {
@@ -144,6 +176,7 @@ export type Database = {
           completed: boolean
           created_at: string
           id: string
+          organization_id: string | null
           session_id: string
           updated_at: string
         }
@@ -151,6 +184,7 @@ export type Database = {
           completed?: boolean
           created_at?: string
           id?: string
+          organization_id?: string | null
           session_id: string
           updated_at?: string
         }
@@ -158,10 +192,19 @@ export type Database = {
           completed?: boolean
           created_at?: string
           id?: string
+          organization_id?: string | null
           session_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "diagnostics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       empathy_map: {
         Row: {
@@ -171,6 +214,7 @@ export type Database = {
           id: string
           necessidades: string | null
           objecoes: string | null
+          organization_id: string | null
           pensamentos: string | null
           sentimentos: string | null
           session_id: string
@@ -183,6 +227,7 @@ export type Database = {
           id?: string
           necessidades?: string | null
           objecoes?: string | null
+          organization_id?: string | null
           pensamentos?: string | null
           sentimentos?: string | null
           session_id: string
@@ -195,18 +240,28 @@ export type Database = {
           id?: string
           necessidades?: string | null
           objecoes?: string | null
+          organization_id?: string | null
           pensamentos?: string | null
           sentimentos?: string | null
           session_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "empathy_map_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       filosofia: {
         Row: {
           created_at: string
           id: string
           missao: string | null
+          organization_id: string | null
           session_id: string
           updated_at: string
           valores: string | null
@@ -216,6 +271,7 @@ export type Database = {
           created_at?: string
           id?: string
           missao?: string | null
+          organization_id?: string | null
           session_id: string
           updated_at?: string
           valores?: string | null
@@ -225,12 +281,21 @@ export type Database = {
           created_at?: string
           id?: string
           missao?: string | null
+          organization_id?: string | null
           session_id?: string
           updated_at?: string
           valores?: string | null
           visao?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "filosofia_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       indicators: {
         Row: {
@@ -240,6 +305,7 @@ export type Database = {
           mensal: string | null
           meta: string | null
           nome: string | null
+          organization_id: string | null
           origem: string | null
           session_id: string
           updated_at: string
@@ -251,6 +317,7 @@ export type Database = {
           mensal?: string | null
           meta?: string | null
           nome?: string | null
+          organization_id?: string | null
           origem?: string | null
           session_id: string
           updated_at?: string
@@ -262,11 +329,20 @@ export type Database = {
           mensal?: string | null
           meta?: string | null
           nome?: string | null
+          organization_id?: string | null
           origem?: string | null
           session_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "indicators_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       management_routines: {
         Row: {
@@ -274,6 +350,7 @@ export type Database = {
           created_at: string
           id: string
           mensal: string | null
+          organization_id: string | null
           semanal: string | null
           session_id: string
           trimestral: string | null
@@ -284,6 +361,7 @@ export type Database = {
           created_at?: string
           id?: string
           mensal?: string | null
+          organization_id?: string | null
           semanal?: string | null
           session_id: string
           trimestral?: string | null
@@ -294,12 +372,65 @@ export type Database = {
           created_at?: string
           id?: string
           mensal?: string | null
+          organization_id?: string | null
           semanal?: string | null
           session_id?: string
           trimestral?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "management_routines_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      module_permissions: {
+        Row: {
+          can_edit: boolean
+          can_manage: boolean
+          can_view: boolean
+          created_at: string
+          id: string
+          module: string
+          organization_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+        }
+        Insert: {
+          can_edit?: boolean
+          can_manage?: boolean
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          module: string
+          organization_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Update: {
+          can_edit?: boolean
+          can_manage?: boolean
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          module?: string
+          organization_id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_permissions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       okrs: {
         Row: {
@@ -307,6 +438,7 @@ export type Database = {
           id: string
           krs: string | null
           objetivo: string | null
+          organization_id: string | null
           session_id: string
           updated_at: string
         }
@@ -315,6 +447,7 @@ export type Database = {
           id?: string
           krs?: string | null
           objetivo?: string | null
+          organization_id?: string | null
           session_id: string
           updated_at?: string
         }
@@ -323,10 +456,78 @@ export type Database = {
           id?: string
           krs?: string | null
           objetivo?: string | null
+          organization_id?: string | null
           session_id?: string
           updated_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "okrs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
         Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          organization_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          organization_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          organization_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       swot_analysis: {
         Row: {
@@ -337,6 +538,7 @@ export type Database = {
           fraquezas: string | null
           id: string
           oportunidades: string | null
+          organization_id: string | null
           session_id: string
           updated_at: string
         }
@@ -348,6 +550,7 @@ export type Database = {
           fraquezas?: string | null
           id?: string
           oportunidades?: string | null
+          organization_id?: string | null
           session_id: string
           updated_at?: string
         }
@@ -359,8 +562,38 @@ export type Database = {
           fraquezas?: string | null
           id?: string
           oportunidades?: string | null
+          organization_id?: string | null
           session_id?: string
           updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "swot_analysis_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
         Relationships: []
       }
@@ -369,10 +602,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_company_code: { Args: never; Returns: string }
+      get_user_organization: { Args: { _user_id: string }; Returns: string }
+      has_module_permission: {
+        Args: { _module: string; _permission: string; _user_id: string }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "gestor" | "usuario"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -499,6 +744,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "gestor", "usuario"],
+    },
   },
 } as const

@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface Action {
   id?: string;
@@ -19,23 +20,21 @@ export const useActionPlanState = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
-
-  const getSessionId = useCallback(() => {
-    let sessionId = localStorage.getItem("trinity_session_id");
-    if (!sessionId) {
-      sessionId = crypto.randomUUID();
-      localStorage.setItem("trinity_session_id", sessionId);
-    }
-    return sessionId;
-  }, []);
+  const { organization } = useAuth();
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  const isInitialLoad = useRef(true);
 
   const loadActions = useCallback(async () => {
+    if (!organization?.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const sessionId = getSessionId();
       const { data, error } = await supabase
         .from("action_plan")
         .select("*")
-        .eq("session_id", sessionId)
+        .eq("organization_id", organization.id)
         .order("created_at", { ascending: true });
 
       if (error) throw error;
@@ -60,17 +59,17 @@ export const useActionPlanState = () => {
       });
     } finally {
       setLoading(false);
+      isInitialLoad.current = false;
     }
-  }, [getSessionId, toast]);
+  }, [organization?.id, toast]);
 
   const saveActions = useCallback(async (actionsToSave: Action[]) => {
+    if (!organization?.id) return;
+
     setSaving(true);
     try {
-      const sessionId = getSessionId();
-
       for (const action of actionsToSave) {
         if (action.id) {
-          // Update existing
           const { error } = await supabase
             .from("action_plan")
             .update({
@@ -85,18 +84,18 @@ export const useActionPlanState = () => {
 
           if (error) throw error;
         } else if (action.acao || action.origem || action.responsavel || action.prazo || action.status || action.obs) {
-          // Insert new (only if has content)
           const { data, error } = await supabase
             .from("action_plan")
-            .insert({
-              session_id: sessionId,
+            .insert([{
+              organization_id: organization.id,
+              session_id: organization.id,
               acao: action.acao,
               origem: action.origem,
               responsavel: action.responsavel,
               prazo: action.prazo,
               status: action.status,
               obs: action.obs,
-            })
+            }])
             .select()
             .single();
 
@@ -114,7 +113,7 @@ export const useActionPlanState = () => {
     } finally {
       setSaving(false);
     }
-  }, [getSessionId, toast]);
+  }, [organization?.id, toast]);
 
   useEffect(() => {
     loadActions();
@@ -133,13 +132,21 @@ export const useActionPlanState = () => {
   }, []);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || isInitialLoad.current) return;
     
-    const timeoutId = setTimeout(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
       saveActions(actions);
     }, 1000);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
   }, [actions, loading, saveActions]);
 
   return {
