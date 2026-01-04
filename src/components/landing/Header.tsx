@@ -27,16 +27,11 @@ const Header = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
-          <div className="flex items-center gap-3">
-            <img
-              src={trinityLogo}
-              alt="Trinity Hub"
-              className="h-10 w-auto"
-            />
-            <span className="text-xl font-bold text-foreground hidden sm:inline">
-              Trinity Hub
-            </span>
-          </div>
+          <img
+            src={trinityLogo}
+            alt="Trinity Hub"
+            className="h-10 w-auto"
+          />
 
           {/* CTA */}
           <Button
