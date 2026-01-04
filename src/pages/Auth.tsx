@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,8 +28,28 @@ export default function Auth() {
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/dashboard";
 
   // Redirect if already logged in
+  useEffect(() => {
+    const checkAndRedirect = async () => {
+      if (!user) return;
+      
+      // Check subscription status
+      const { data: subscription } = await supabase
+        .from("subscriptions")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      
+      if (!subscription) {
+        navigate("/escolher-plano", { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
+    };
+    
+    checkAndRedirect();
+  }, [user, navigate, from]);
+
   if (user) {
-    navigate(from, { replace: true });
     return null;
   }
 

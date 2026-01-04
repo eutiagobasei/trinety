@@ -24,7 +24,7 @@ const Index = () => {
       if (organization) {
         navigate("/dashboard", { replace: true });
       } else {
-        navigate("/onboarding", { replace: true });
+        navigate("/criar-empresa", { replace: true });
       }
     }
   }, [user, organization, isLoading, navigate]);
