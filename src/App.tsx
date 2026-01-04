@@ -7,7 +7,9 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import Onboarding from "./pages/Onboarding";
+import EscolherPlano from "./pages/EscolherPlano";
+import CriarEmpresa from "./pages/CriarEmpresa";
+import Convite from "./pages/Convite";
 import Diagnostico from "./pages/Diagnostico";
 import Dashboard from "./pages/Dashboard";
 import ModeloDeNegocio from "./pages/ModeloDeNegocio";
@@ -32,7 +34,9 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/escolher-plano" element={<EscolherPlano />} />
+            <Route path="/criar-empresa" element={<CriarEmpresa />} />
+            <Route path="/convite/:token" element={<Convite />} />
             <Route
               path="/diagnostico"
               element={

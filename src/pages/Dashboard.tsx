@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowRight, LogOut, Copy, Check } from "lucide-react";
+import { ArrowRight, LogOut, UserPlus } from "lucide-react";
 import { OrganizationSelector } from "@/components/OrganizationSelector";
 import { useToast } from "@/hooks/use-toast";
+import { InviteModal } from "@/components/InviteModal";
+import { TrialBanner } from "@/components/TrialBanner";
 import trinityLogo from "@/assets/trinity-logo.png";
 
 export default function Dashboard() {
@@ -16,12 +18,11 @@ export default function Dashboard() {
   const { toast } = useToast();
   
   const [diagnosticProgress, setDiagnosticProgress] = useState(0);
-  const [codeCopied, setCodeCopied] = useState(false);
 
-  // Redirect to onboarding if no organization
+  // Redirect to criar-empresa if no organization
   useEffect(() => {
     if (organizations.length === 0) {
-      navigate("/onboarding", { replace: true });
+      navigate("/criar-empresa", { replace: true });
     }
   }, [organizations, navigate]);
 
@@ -72,18 +73,6 @@ export default function Dashboard() {
 
     loadProgress();
   }, [organization]);
-
-  const handleCopyCode = async () => {
-    if (!organization?.code) return;
-    
-    await navigator.clipboard.writeText(organization.code);
-    setCodeCopied(true);
-    toast({
-      title: "Código copiado!",
-      description: "Compartilhe com seus colaboradores.",
-    });
-    setTimeout(() => setCodeCopied(false), 2000);
-  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -145,6 +134,9 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Trial Banner */}
+      <TrialBanner />
+      
       {/* Header */}
       <header className="bg-card border-b border-border">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
@@ -153,20 +145,13 @@ export default function Dashboard() {
             <OrganizationSelector />
           </div>
           <div className="flex items-center gap-3">
-            {role === "admin" && organization.code && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopyCode}
-                className="flex items-center gap-2"
-              >
-                {codeCopied ? (
-                  <Check className="h-4 w-4 text-green-500" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-                <span className="font-mono">{organization.code}</span>
-              </Button>
+            {(role === "admin" || role === "gestor") && (
+              <InviteModal>
+                <Button variant="outline" size="sm">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Convidar
+                </Button>
+              </InviteModal>
             )}
             <Button variant="outline" size="sm" onClick={handleSignOut}>
               <LogOut className="h-4 w-4 mr-2" />
@@ -175,7 +160,6 @@ export default function Dashboard() {
           </div>
         </div>
       </header>
-
       <main className="container mx-auto px-6 py-10">
         {/* Título */}
         <div className="mb-8">

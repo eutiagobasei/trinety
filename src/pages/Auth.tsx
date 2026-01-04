@@ -118,7 +118,7 @@ export default function Auth() {
       description: "Bem-vindo ao Trinity Hub.",
     });
     
-    navigate("/onboarding", { replace: true });
+    navigate("/escolher-plano", { replace: true });
   };
 
   return (
