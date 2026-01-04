@@ -24,7 +24,7 @@ export function ProtectedRoute({ children, requireOrganization = true }: Protect
   }
 
   if (requireOrganization && !organization) {
-    return <Navigate to="/onboarding" state={{ from: location }} replace />;
+    return <Navigate to="/criar-empresa" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;
