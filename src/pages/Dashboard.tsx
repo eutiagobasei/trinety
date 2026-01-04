@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowRight, LogOut, UserPlus } from "lucide-react";
+import { ArrowRight, LogOut, UserPlus, Crown } from "lucide-react";
 import { OrganizationSelector } from "@/components/OrganizationSelector";
 import { useToast } from "@/hooks/use-toast";
 import { InviteModal } from "@/components/InviteModal";
@@ -14,7 +14,7 @@ import trinityLogo from "@/assets/trinity-logo.png";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { organization, role, signOut, organizations } = useAuth();
+  const { organization, role, signOut, organizations, isSuperAdmin } = useAuth();
   const { toast } = useToast();
   
   const [diagnosticProgress, setDiagnosticProgress] = useState(0);
@@ -145,6 +145,12 @@ export default function Dashboard() {
             <OrganizationSelector />
           </div>
           <div className="flex items-center gap-3">
+            {isSuperAdmin && (
+              <Button variant="outline" size="sm" onClick={() => navigate("/admin")}>
+                <Crown className="h-4 w-4 mr-2" />
+                Admin
+              </Button>
+            )}
             {(role === "admin" || role === "gestor") && (
               <InviteModal>
                 <Button variant="outline" size="sm">
