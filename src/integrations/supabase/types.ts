@@ -716,6 +716,27 @@ export type Database = {
           },
         ]
       }
+      system_admins: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_organizations: {
         Row: {
           created_at: string
@@ -818,6 +839,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_system_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "gestor" | "usuario"

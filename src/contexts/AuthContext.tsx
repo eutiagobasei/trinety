@@ -33,6 +33,7 @@ interface AuthContextType {
   organizations: UserOrganization[];
   role: AppRole | null;
   isLoading: boolean;
+  isSuperAdmin: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -50,9 +51,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [organizations, setOrganizations] = useState<UserOrganization[]>([]);
   const [role, setRole] = useState<AppRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const fetchUserData = async (userId: string) => {
     try {
+      // Check if user is super admin
+      const { data: superAdminData } = await supabase
+        .from("system_admins")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      
+      setIsSuperAdmin(!!superAdminData);
+
       // Fetch profile
       const { data: profileData } = await supabase
         .from("profiles")
@@ -142,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setOrganization(null);
           setOrganizations([]);
           setRole(null);
+          setIsSuperAdmin(false);
         }
       }
     );
@@ -197,6 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOrganization(null);
     setOrganizations([]);
     setRole(null);
+    setIsSuperAdmin(false);
   };
 
   const refreshProfile = async () => {
@@ -234,6 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         organizations,
         role,
         isLoading,
+        isSuperAdmin,
         signUp,
         signIn,
         signOut,
