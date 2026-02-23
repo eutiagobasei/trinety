@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { apiClient } from "@/lib/api-client";
+import { useOrganization } from "@/hooks/useOrganization";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 
 interface OkrsState {
   objetivo: string;
   krs: string;
 }
+
+const DEBOUNCE_MS = 1000;
 
 export const useOkrsState = () => {
   const [okrs, setOkrs] = useState<OkrsState>({
@@ -15,9 +17,9 @@ export const useOkrsState = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
-  const { organization } = useAuth();
+  const { organization } = useOrganization();
 
   useEffect(() => {
     if (!organization?.id) {
@@ -27,20 +29,14 @@ export const useOkrsState = () => {
 
     const loadOkrs = async () => {
       try {
-        const { data, error } = await supabase
-          .from("okrs")
-          .select("*")
-          .eq("organization_id", organization.id)
-          .maybeSingle();
+        const data = await apiClient.get<OkrsState>(
+          `/organizations/${organization.id}/strategic-planning/okrs`
+        );
 
-        if (error) throw error;
-
-        if (data) {
-          setOkrs({
-            objetivo: data.objetivo || "",
-            krs: data.krs || "",
-          });
-        }
+        setOkrs({
+          objetivo: data.objetivo || "",
+          krs: data.krs || "",
+        });
       } catch (error) {
         console.error("Error loading OKRs:", error);
         toast({
@@ -63,22 +59,10 @@ export const useOkrsState = () => {
       try {
         setIsSaving(true);
 
-        const { error } = await supabase
-          .from("okrs")
-          .upsert(
-            {
-              organization_id: organization.id,
-              session_id: organization.id,
-              objetivo: newOkrs.objetivo,
-              krs: newOkrs.krs,
-              updated_at: new Date().toISOString(),
-            },
-            {
-              onConflict: "organization_id",
-            }
-          );
-
-        if (error) throw error;
+        await apiClient.put(
+          `/organizations/${organization.id}/strategic-planning/okrs`,
+          newOkrs
+        );
       } catch (error) {
         console.error("Error saving OKRs:", error);
         toast({
@@ -95,20 +79,21 @@ export const useOkrsState = () => {
 
   const updateOkrs = useCallback(
     (field: keyof OkrsState, value: string) => {
-      const newOkrs = { ...okrs, [field]: value };
-      setOkrs(newOkrs);
+      setOkrs((prev) => {
+        const newOkrs = { ...prev, [field]: value };
 
-      if (saveTimeout) {
-        clearTimeout(saveTimeout);
-      }
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+        }
 
-      const timeout = setTimeout(() => {
-        saveOkrs(newOkrs);
-      }, 1000);
+        saveTimeoutRef.current = setTimeout(() => {
+          saveOkrs(newOkrs);
+        }, DEBOUNCE_MS);
 
-      setSaveTimeout(timeout);
+        return newOkrs;
+      });
     },
-    [okrs, saveTimeout, saveOkrs]
+    [saveOkrs]
   );
 
   return {

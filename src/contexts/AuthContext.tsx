@@ -1,36 +1,46 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/lib/api-client";
 
-interface Profile {
+interface User {
   id: string;
-  full_name: string | null;
-  email: string | null;
-  active_organization_id: string | null;
+  email: string;
+  fullName: string | null;
+  isSystemAdmin: boolean;
+  activeOrganizationId: string | null;
 }
 
 interface Organization {
   id: string;
   name: string;
   code: string;
-}
-
-interface UserOrganization {
-  id: string;
-  organization_id: string;
   role: AppRole;
-  is_owner: boolean;
-  organization: Organization;
+  isOwner: boolean;
 }
 
 type AppRole = "admin" | "gestor" | "usuario";
 
+interface ProfileResponse {
+  id: string;
+  email: string;
+  fullName: string | null;
+  isSystemAdmin: boolean;
+  activeOrganizationId: string | null;
+  organizations: Organization[];
+  currentRole: AppRole | null;
+  isOwner: boolean;
+}
+
+interface AuthResponse {
+  user: User;
+  accessToken: string;
+  refreshToken: string;
+}
+
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
-  profile: Profile | null;
+  profile: User | null;
   organization: Organization | null;
-  organizations: UserOrganization[];
+  organizations: Organization[];
   role: AppRole | null;
   isLoading: boolean;
   isSuperAdmin: boolean;
@@ -45,167 +55,97 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organization, setOrganization] = useState<Organization | null>(null);
-  const [organizations, setOrganizations] = useState<UserOrganization[]>([]);
   const [role, setRole] = useState<AppRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  const fetchUserData = async (userId: string) => {
+  const fetchProfile = async () => {
     try {
-      // Check if user is super admin
-      const { data: superAdminData } = await supabase
-        .from("system_admins")
-        .select("id")
-        .eq("user_id", userId)
-        .maybeSingle();
-      
-      setIsSuperAdmin(!!superAdminData);
+      const data = await apiClient.get<ProfileResponse>("/auth/profile");
 
-      // Fetch profile
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("id, full_name, email, active_organization_id")
-        .eq("id", userId)
-        .maybeSingle();
+      setUser({
+        id: data.id,
+        email: data.email,
+        fullName: data.fullName,
+        isSystemAdmin: data.isSystemAdmin,
+        activeOrganizationId: data.activeOrganizationId,
+      });
 
-      if (profileData) {
-        setProfile(profileData);
+      setIsSuperAdmin(data.isSystemAdmin);
+      setOrganizations(data.organizations);
 
-        // Fetch all user organizations
-        const { data: userOrgs } = await supabase
-          .from("user_organizations")
-          .select(`
-            id,
-            organization_id,
-            role,
-            is_owner,
-            organization:organizations(id, name, code)
-          `)
-          .eq("user_id", userId);
-
-        if (userOrgs && userOrgs.length > 0) {
-          const formattedOrgs = userOrgs.map(uo => ({
-            id: uo.id,
-            organization_id: uo.organization_id,
-            role: uo.role as AppRole,
-            is_owner: uo.is_owner,
-            organization: uo.organization as unknown as Organization
-          }));
-          setOrganizations(formattedOrgs);
-
-          // Set active organization
-          const activeOrgId = profileData.active_organization_id;
-          if (activeOrgId) {
-            const activeUserOrg = formattedOrgs.find(uo => uo.organization_id === activeOrgId);
-            if (activeUserOrg) {
-              setOrganization(activeUserOrg.organization);
-              setRole(activeUserOrg.role);
-            } else {
-              // Active org not in user's orgs, reset to first one
-              const firstOrg = formattedOrgs[0];
-              setOrganization(firstOrg.organization);
-              setRole(firstOrg.role);
-              // Update profile with first org
-              await supabase
-                .from("profiles")
-                .update({ active_organization_id: firstOrg.organization_id })
-                .eq("id", userId);
-            }
-          } else {
-            // No active org set, use first one
-            const firstOrg = formattedOrgs[0];
-            setOrganization(firstOrg.organization);
-            setRole(firstOrg.role);
-            // Update profile with first org
-            await supabase
-              .from("profiles")
-              .update({ active_organization_id: firstOrg.organization_id })
-              .eq("id", userId);
-          }
-        } else {
-          setOrganizations([]);
-          setOrganization(null);
-          setRole(null);
+      if (data.activeOrganizationId && data.organizations.length > 0) {
+        const activeOrg = data.organizations.find(
+          (o) => o.id === data.activeOrganizationId
+        );
+        if (activeOrg) {
+          setOrganization(activeOrg);
+          setRole(activeOrg.role);
         }
+      } else if (data.organizations.length > 0) {
+        const firstOrg = data.organizations[0];
+        setOrganization(firstOrg);
+        setRole(firstOrg.role);
       }
     } catch (error) {
-      console.error("Error fetching user data:", error);
+      console.error("Error fetching profile:", error);
+      apiClient.clearTokens();
+      setUser(null);
     }
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          // Defer data fetching to avoid deadlock
-          setTimeout(() => {
-            fetchUserData(session.user.id);
-          }, 0);
-        } else {
-          setProfile(null);
-          setOrganization(null);
-          setOrganizations([]);
-          setRole(null);
-          setIsSuperAdmin(false);
-        }
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchUserData(session.user.id).finally(() => {
-          setIsLoading(false);
-        });
-      } else {
-        setIsLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    const token = localStorage.getItem("accessToken");
+    if (token) {
+      fetchProfile().finally(() => setIsLoading(false));
+    } else {
+      setIsLoading(false);
+    }
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
-        },
-      },
-    });
+    try {
+      const data = await apiClient.post<AuthResponse>("/auth/signup", {
+        email,
+        password,
+        fullName,
+      });
 
-    return { error: error as Error | null };
+      apiClient.setToken(data.accessToken);
+      apiClient.setRefreshToken(data.refreshToken);
+
+      setUser(data.user);
+      setIsSuperAdmin(data.user.isSystemAdmin);
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const data = await apiClient.post<AuthResponse>("/auth/signin", {
+        email,
+        password,
+      });
 
-    return { error: error as Error | null };
+      apiClient.setToken(data.accessToken);
+      apiClient.setRefreshToken(data.refreshToken);
+
+      await fetchProfile();
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    apiClient.clearTokens();
     setUser(null);
-    setSession(null);
-    setProfile(null);
     setOrganization(null);
     setOrganizations([]);
     setRole(null);
@@ -213,27 +153,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshProfile = async () => {
-    if (user) {
-      await fetchUserData(user.id);
-    }
+    await fetchProfile();
   };
 
   const switchOrganization = async (organizationId: string) => {
-    if (!user) return;
+    try {
+      await apiClient.post("/auth/switch-organization", { organizationId });
 
-    const userOrg = organizations.find(uo => uo.organization_id === organizationId);
-    if (!userOrg) return;
-
-    // Update profile with new active organization
-    const { error } = await supabase
-      .from("profiles")
-      .update({ active_organization_id: organizationId })
-      .eq("id", user.id);
-
-    if (!error) {
-      setOrganization(userOrg.organization);
-      setRole(userOrg.role);
-      setProfile(prev => prev ? { ...prev, active_organization_id: organizationId } : null);
+      const org = organizations.find((o) => o.id === organizationId);
+      if (org) {
+        setOrganization(org);
+        setRole(org.role);
+      }
+    } catch (error) {
+      console.error("Error switching organization:", error);
     }
   };
 
@@ -241,8 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        session,
-        profile,
+        profile: user,
         organization,
         organizations,
         role,

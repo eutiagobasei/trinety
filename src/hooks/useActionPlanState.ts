@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/lib/api-client";
+import { useOrganization } from "@/hooks/useOrganization";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 
 export interface Action {
   id?: string;
@@ -13,6 +13,8 @@ export interface Action {
   obs: string;
 }
 
+const DEBOUNCE_MS = 1000;
+
 export const useActionPlanState = () => {
   const [actions, setActions] = useState<Action[]>([
     { acao: "", origem: "", responsavel: "", prazo: "", status: "", obs: "" }
@@ -20,7 +22,7 @@ export const useActionPlanState = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
-  const { organization } = useAuth();
+  const { organization } = useOrganization();
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
   const isInitialLoad = useRef(true);
 
@@ -31,13 +33,9 @@ export const useActionPlanState = () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from("action_plan")
-        .select("*")
-        .eq("organization_id", organization.id)
-        .order("created_at", { ascending: true });
-
-      if (error) throw error;
+      const data = await apiClient.get<Action[]>(
+        `/organizations/${organization.id}/strategic-planning/action-plan`
+      );
 
       if (data && data.length > 0) {
         setActions(data.map(item => ({
@@ -68,40 +66,21 @@ export const useActionPlanState = () => {
 
     setSaving(true);
     try {
-      for (const action of actionsToSave) {
-        if (action.id) {
-          const { error } = await supabase
-            .from("action_plan")
-            .update({
-              acao: action.acao,
-              origem: action.origem,
-              responsavel: action.responsavel,
-              prazo: action.prazo,
-              status: action.status,
-              obs: action.obs,
-            })
-            .eq("id", action.id);
+      const response = await apiClient.put<Action[]>(
+        `/organizations/${organization.id}/strategic-planning/action-plan`,
+        actionsToSave
+      );
 
-          if (error) throw error;
-        } else if (action.acao || action.origem || action.responsavel || action.prazo || action.status || action.obs) {
-          const { data, error } = await supabase
-            .from("action_plan")
-            .insert([{
-              organization_id: organization.id,
-              session_id: organization.id,
-              acao: action.acao,
-              origem: action.origem,
-              responsavel: action.responsavel,
-              prazo: action.prazo,
-              status: action.status,
-              obs: action.obs,
-            }])
-            .select()
-            .single();
-
-          if (error) throw error;
-          action.id = data.id;
-        }
+      if (response && response.length > 0) {
+        setActions(response.map(item => ({
+          id: item.id,
+          acao: item.acao || "",
+          origem: item.origem || "",
+          responsavel: item.responsavel || "",
+          prazo: item.prazo || "",
+          status: item.status || "",
+          obs: item.obs || ""
+        })));
       }
     } catch (error) {
       console.error("Error saving action plan:", error);
@@ -133,14 +112,14 @@ export const useActionPlanState = () => {
 
   useEffect(() => {
     if (loading || isInitialLoad.current) return;
-    
+
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
     saveTimeoutRef.current = setTimeout(() => {
       saveActions(actions);
-    }, 1000);
+    }, DEBOUNCE_MS);
 
     return () => {
       if (saveTimeoutRef.current) {

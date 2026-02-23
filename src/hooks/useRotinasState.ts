@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/lib/api-client";
+import { useOrganization } from "@/hooks/useOrganization";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 
 export interface Rotinas {
   semanal: string;
@@ -9,6 +9,8 @@ export interface Rotinas {
   trimestral: string;
   anual: string;
 }
+
+const DEBOUNCE_MS = 1000;
 
 export const useRotinasState = () => {
   const [rotinas, setRotinas] = useState<Rotinas>({
@@ -20,7 +22,7 @@ export const useRotinasState = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
-  const { organization } = useAuth();
+  const { organization } = useOrganization();
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
   const isInitialLoad = useRef(true);
 
@@ -31,22 +33,16 @@ export const useRotinasState = () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from("management_routines")
-        .select("*")
-        .eq("organization_id", organization.id)
-        .maybeSingle();
+      const data = await apiClient.get<Rotinas>(
+        `/organizations/${organization.id}/strategic-planning/routines`
+      );
 
-      if (error) throw error;
-
-      if (data) {
-        setRotinas({
-          semanal: data.semanal || "",
-          mensal: data.mensal || "",
-          trimestral: data.trimestral || "",
-          anual: data.anual || "",
-        });
-      }
+      setRotinas({
+        semanal: data.semanal || "",
+        mensal: data.mensal || "",
+        trimestral: data.trimestral || "",
+        anual: data.anual || "",
+      });
     } catch (error) {
       console.error("Error loading rotinas:", error);
       toast({
@@ -65,23 +61,10 @@ export const useRotinasState = () => {
 
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from("management_routines")
-        .upsert(
-          {
-            organization_id: organization.id,
-            session_id: organization.id,
-            semanal: rotinasToSave.semanal,
-            mensal: rotinasToSave.mensal,
-            trimestral: rotinasToSave.trimestral,
-            anual: rotinasToSave.anual,
-          },
-          {
-            onConflict: "organization_id",
-          }
-        );
-
-      if (error) throw error;
+      await apiClient.put(
+        `/organizations/${organization.id}/strategic-planning/routines`,
+        rotinasToSave
+      );
     } catch (error) {
       console.error("Error saving rotinas:", error);
       toast({
@@ -104,14 +87,14 @@ export const useRotinasState = () => {
 
   useEffect(() => {
     if (loading || isInitialLoad.current) return;
-    
+
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
     saveTimeoutRef.current = setTimeout(() => {
       saveRotinas(rotinas);
-    }, 1000);
+    }, DEBOUNCE_MS);
 
     return () => {
       if (saveTimeoutRef.current) {

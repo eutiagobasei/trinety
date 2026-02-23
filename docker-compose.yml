@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: trinety-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trinety
+      POSTGRES_PASSWORD: trinety
+      POSTGRES_DB: trinety
+    ports:
+      - "5440:5432"
+    volumes:
+      - trinety_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trinety"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - trinety-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trinety-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=trinety
+      - DB_PASSWORD=trinety
+      - DB_DATABASE=trinety
+      - JWT_SECRET=trinety-super-secret-jwt-key-2024
+      - JWT_EXPIRES_IN=7d
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - FRONTEND_URL=http://localhost:5180
+    ports:
+      - "3050:3000"
+    volumes:
+      - ./backend/src:/app/src:delegated
+    networks:
+      - trinety-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: trinety-web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_URL=http://localhost:3050/api
+    ports:
+      - "5180:8080"
+    volumes:
+      - ./src:/app/src:delegated
+      - ./public:/app/public:delegated
+    networks:
+      - trinety-network
+
+volumes:
+  trinety_postgres_data:
+
+networks:
+  trinety-network:
+    driver: bridge

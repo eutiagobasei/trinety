@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/lib/api-client";
+import { useOrganization } from "@/hooks/useOrganization";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 
 interface EmpathyMapData {
   dores: string;
@@ -16,7 +16,7 @@ const DEBOUNCE_MS = 1000;
 
 export const useEmpathyMapState = () => {
   const { toast } = useToast();
-  const { organization } = useAuth();
+  const { organization } = useOrganization();
   const [empathyMap, setEmpathyMap] = useState<EmpathyMapData>({
     dores: "",
     ganhos: "",
@@ -27,7 +27,6 @@ export const useEmpathyMapState = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [recordId, setRecordId] = useState<string | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
@@ -37,23 +36,11 @@ export const useEmpathyMapState = () => {
     }
 
     const loadEmpathyMap = async () => {
-      const { data, error } = await supabase
-        .from("empathy_map")
-        .select("*")
-        .eq("organization_id", organization.id)
-        .maybeSingle();
+      try {
+        const data = await apiClient.get<EmpathyMapData>(
+          `/organizations/${organization.id}/strategic-planning/empathy-map`
+        );
 
-      if (error && error.code !== "PGRST116") {
-        console.error("Error loading empathy map:", error);
-        toast({
-          title: "Erro ao carregar mapa",
-          description: "Não foi possível carregar os dados salvos.",
-          variant: "destructive",
-        });
-      }
-
-      if (data) {
-        setRecordId(data.id);
         setEmpathyMap({
           dores: data.dores || "",
           ganhos: data.ganhos || "",
@@ -62,30 +49,16 @@ export const useEmpathyMapState = () => {
           sentimentos: data.sentimentos || "",
           objecoes: data.objecoes || "",
         });
-      } else {
-        const { data: newRecord, error: insertError } = await supabase
-          .from("empathy_map")
-          .insert([{
-            organization_id: organization.id,
-            session_id: organization.id,
-            dores: "",
-            ganhos: "",
-            necessidades: "",
-            pensamentos: "",
-            sentimentos: "",
-            objecoes: "",
-          }])
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error("Error creating empathy map:", insertError);
-        } else if (newRecord) {
-          setRecordId(newRecord.id);
-        }
+      } catch (error) {
+        console.error("Error loading empathy map:", error);
+        toast({
+          title: "Erro ao carregar mapa",
+          description: "Não foi possível carregar os dados salvos.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
     };
 
     loadEmpathyMap();
@@ -93,34 +66,27 @@ export const useEmpathyMapState = () => {
 
   const saveEmpathyMap = useCallback(
     async (updatedMap: EmpathyMapData) => {
-      if (!recordId) return;
+      if (!organization?.id) return;
 
       setIsSaving(true);
 
-      const { error } = await supabase
-        .from("empathy_map")
-        .update({
-          dores: updatedMap.dores,
-          ganhos: updatedMap.ganhos,
-          necessidades: updatedMap.necessidades,
-          pensamentos: updatedMap.pensamentos,
-          sentimentos: updatedMap.sentimentos,
-          objecoes: updatedMap.objecoes,
-        })
-        .eq("id", recordId);
-
-      if (error) {
+      try {
+        await apiClient.put(
+          `/organizations/${organization.id}/strategic-planning/empathy-map`,
+          updatedMap
+        );
+      } catch (error) {
         console.error("Error saving empathy map:", error);
         toast({
           title: "Erro ao salvar",
           description: "Não foi possível salvar as alterações.",
           variant: "destructive",
         });
+      } finally {
+        setIsSaving(false);
       }
-
-      setIsSaving(false);
     },
-    [recordId, toast]
+    [organization?.id, toast]
   );
 
   const updateField = useCallback(

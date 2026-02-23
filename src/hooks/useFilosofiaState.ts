@@ -1,13 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { apiClient } from "@/lib/api-client";
+import { useOrganization } from "@/hooks/useOrganization";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 
 interface FilosofiaState {
   visao: string;
   missao: string;
   valores: string;
 }
+
+const DEBOUNCE_MS = 1000;
 
 export const useFilosofiaState = () => {
   const [filosofia, setFilosofia] = useState<FilosofiaState>({
@@ -17,9 +19,9 @@ export const useFilosofiaState = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
-  const { organization } = useAuth();
+  const { organization } = useOrganization();
 
   useEffect(() => {
     if (!organization?.id) {
@@ -29,21 +31,15 @@ export const useFilosofiaState = () => {
 
     const loadFilosofia = async () => {
       try {
-        const { data, error } = await supabase
-          .from("filosofia")
-          .select("*")
-          .eq("organization_id", organization.id)
-          .maybeSingle();
+        const data = await apiClient.get<FilosofiaState>(
+          `/organizations/${organization.id}/strategic-planning/filosofia`
+        );
 
-        if (error) throw error;
-
-        if (data) {
-          setFilosofia({
-            visao: data.visao || "",
-            missao: data.missao || "",
-            valores: data.valores || "",
-          });
-        }
+        setFilosofia({
+          visao: data.visao || "",
+          missao: data.missao || "",
+          valores: data.valores || "",
+        });
       } catch (error) {
         console.error("Error loading filosofia:", error);
         toast({
@@ -59,56 +55,49 @@ export const useFilosofiaState = () => {
     loadFilosofia();
   }, [organization?.id, toast]);
 
-  const saveFilosofia = useCallback(async (data: FilosofiaState) => {
-    if (!organization?.id) return;
+  const saveFilosofia = useCallback(
+    async (data: FilosofiaState) => {
+      if (!organization?.id) return;
 
-    try {
-      setIsSaving(true);
+      try {
+        setIsSaving(true);
 
-      const { error } = await supabase
-        .from("filosofia")
-        .upsert(
-          {
-            organization_id: organization.id,
-            session_id: organization.id,
-            ...data,
-            updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: "organization_id",
-          }
+        await apiClient.put(
+          `/organizations/${organization.id}/strategic-planning/filosofia`,
+          data
         );
-
-      if (error) throw error;
-    } catch (error) {
-      console.error("Error saving filosofia:", error);
-      toast({
-        title: "Erro ao salvar",
-        description: "Não foi possível salvar as alterações.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  }, [organization?.id, toast]);
-
-  const updateFilosofia = useCallback((field: keyof FilosofiaState, value: string) => {
-    setFilosofia((prev) => {
-      const newState = { ...prev, [field]: value };
-      
-      if (saveTimeout) {
-        clearTimeout(saveTimeout);
+      } catch (error) {
+        console.error("Error saving filosofia:", error);
+        toast({
+          title: "Erro ao salvar",
+          description: "Não foi possível salvar as alterações.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsSaving(false);
       }
+    },
+    [organization?.id, toast]
+  );
 
-      const timeout = setTimeout(() => {
-        saveFilosofia(newState);
-      }, 1000);
+  const updateFilosofia = useCallback(
+    (field: keyof FilosofiaState, value: string) => {
+      setFilosofia((prev) => {
+        const newState = { ...prev, [field]: value };
 
-      setSaveTimeout(timeout);
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+        }
 
-      return newState;
-    });
-  }, [saveTimeout, saveFilosofia]);
+        saveTimeoutRef.current = setTimeout(() => {
+          saveFilosofia(newState);
+        }, DEBOUNCE_MS);
+
+        return newState;
+      });
+    },
+    [saveFilosofia]
+  );
 
   return {
     filosofia,

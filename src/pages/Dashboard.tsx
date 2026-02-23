@@ -1,23 +1,14 @@
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { supabase } from "@/integrations/supabase/client";
-import { ArrowRight, LogOut, UserPlus, Crown } from "lucide-react";
-import { OrganizationSelector } from "@/components/OrganizationSelector";
-import { useToast } from "@/hooks/use-toast";
-import { InviteModal } from "@/components/InviteModal";
-import { TrialBanner } from "@/components/TrialBanner";
+import { ArrowRight, LogOut, Crown, Building2 } from "lucide-react";
 import trinityLogo from "@/assets/trinity-logo.png";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { organization, role, signOut, organizations, isSuperAdmin } = useAuth();
-  const { toast } = useToast();
-  
-  const [diagnosticProgress, setDiagnosticProgress] = useState(0);
+  const { organization, role, signOut, organizations, isSuperAdmin, user } = useAuth();
 
   // Redirect to criar-empresa if no organization
   useEffect(() => {
@@ -25,54 +16,6 @@ export default function Dashboard() {
       navigate("/criar-empresa", { replace: true });
     }
   }, [organizations, navigate]);
-
-  // Load real diagnostic progress
-  useEffect(() => {
-    const loadProgress = async () => {
-      if (!organization) return;
-      
-      try {
-        const sessionId = localStorage.getItem("diagnostic_session_id");
-        if (!sessionId) {
-          setDiagnosticProgress(0);
-          return;
-        }
-
-        const { data: diagnostic } = await supabase
-          .from("diagnostics")
-          .select("id, completed")
-          .eq("session_id", sessionId)
-          .maybeSingle();
-
-        if (!diagnostic) {
-          setDiagnosticProgress(0);
-          return;
-        }
-
-        if (diagnostic.completed) {
-          setDiagnosticProgress(100);
-          return;
-        }
-
-        // Calculate progress based on answers
-        const { data: answers } = await supabase
-          .from("diagnostic_answers")
-          .select("*")
-          .eq("diagnostic_id", diagnostic.id);
-
-        // Total questions = 9 blocks × 3 questions = 27
-        const totalQuestions = 27;
-        const answeredCount = answers?.length || 0;
-        const progress = Math.round((answeredCount / totalQuestions) * 100);
-        
-        setDiagnosticProgress(progress);
-      } catch (error) {
-        console.error("Error loading progress:", error);
-      }
-    };
-
-    loadProgress();
-  }, [organization]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -134,15 +77,15 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Trial Banner */}
-      <TrialBanner />
-      
       {/* Header */}
       <header className="bg-card border-b border-border">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
             <img src={trinityLogo} alt="Trinity Hub" className="h-10" />
-            <OrganizationSelector />
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg">
+              <Building2 className="h-4 w-4 text-primary" />
+              <span className="font-medium text-sm">{organization.name}</span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             {isSuperAdmin && (
@@ -151,14 +94,9 @@ export default function Dashboard() {
                 Admin
               </Button>
             )}
-            {(role === "admin" || role === "gestor") && (
-              <InviteModal>
-                <Button variant="outline" size="sm">
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Convidar
-                </Button>
-              </InviteModal>
-            )}
+            <Button variant="outline" size="sm" onClick={() => navigate("/criar-empresa")}>
+              Nova Empresa
+            </Button>
             <Button variant="outline" size="sm" onClick={handleSignOut}>
               <LogOut className="h-4 w-4 mr-2" />
               Sair
@@ -166,6 +104,7 @@ export default function Dashboard() {
           </div>
         </div>
       </header>
+
       <main className="container mx-auto px-6 py-10">
         {/* Título */}
         <div className="mb-8">
@@ -173,30 +112,25 @@ export default function Dashboard() {
             Dashboard Estratégico 2026
           </h1>
           <p className="text-muted-foreground">
-            Bem-vindo(a)! Aqui você acompanha e edita todas as etapas do seu Planejamento Estratégico 2026.
+            Olá, {user?.fullName || user?.email}! Aqui você acompanha e edita todas as etapas do seu Planejamento Estratégico.
           </p>
         </div>
 
-        {/* Card de Progresso do Diagnóstico */}
-        {diagnosticProgress < 100 && (
-          <Card className="mb-8 border-primary/20 bg-primary/5">
-            <CardHeader>
-              <CardTitle>Complete seu Diagnóstico</CardTitle>
-              <CardDescription>
-                Finalize o diagnóstico para desbloquear todas as ferramentas estratégicas
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Progress value={diagnosticProgress} className="h-3 mb-3" />
-              <p className="text-sm text-muted-foreground mb-4">
-                {diagnosticProgress}% concluído
-              </p>
-              <Button onClick={() => navigate("/diagnostico")}>
-                Continuar Diagnóstico
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+        {/* Card de Início */}
+        <Card className="mb-8 border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle>Comece pelo Diagnóstico</CardTitle>
+            <CardDescription>
+              Responda as perguntas do diagnóstico para gerar automaticamente todas as ferramentas estratégicas
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => navigate("/diagnostico")}>
+              Iniciar Diagnóstico
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Grid de Ferramentas */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">

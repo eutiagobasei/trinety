@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/lib/api-client";
+import { useOrganization } from "@/hooks/useOrganization";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 
 const DEBOUNCE_MS = 1000;
 
@@ -18,7 +18,6 @@ export interface CanvasData {
 }
 
 export const useCanvasState = () => {
-  const [canvasId, setCanvasId] = useState<string | null>(null);
   const [canvas, setCanvas] = useState<CanvasData>({
     segmentos: "",
     proposta: "",
@@ -34,7 +33,7 @@ export const useCanvasState = () => {
   const [isSaving, setIsSaving] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
-  const { organization } = useAuth();
+  const { organization } = useOrganization();
 
   useEffect(() => {
     if (!organization?.id) {
@@ -44,47 +43,21 @@ export const useCanvasState = () => {
 
     const initCanvas = async () => {
       try {
-        const { data: existingCanvas, error: fetchError } = await supabase
-          .from("business_model_canvas")
-          .select("*")
-          .eq("organization_id", organization.id)
-          .maybeSingle();
+        const data = await apiClient.get<CanvasData>(
+          `/organizations/${organization.id}/strategic-planning/canvas`
+        );
 
-        if (fetchError) {
-          console.error("Error fetching canvas:", fetchError);
-          throw fetchError;
-        }
-
-        if (existingCanvas) {
-          setCanvasId(existingCanvas.id);
-          setCanvas({
-            segmentos: existingCanvas.segmentos || "",
-            proposta: existingCanvas.proposta || "",
-            canais: existingCanvas.canais || "",
-            relacionamento: existingCanvas.relacionamento || "",
-            atividades: existingCanvas.atividades || "",
-            recursos: existingCanvas.recursos || "",
-            parceiros: existingCanvas.parceiros || "",
-            custos: existingCanvas.custos || "",
-            receitas: existingCanvas.receitas || ""
-          });
-        } else {
-          const { data: newCanvas, error: createError } = await supabase
-            .from("business_model_canvas")
-            .insert([{ 
-              organization_id: organization.id,
-              session_id: organization.id 
-            }])
-            .select()
-            .single();
-
-          if (createError) {
-            console.error("Error creating canvas:", createError);
-            throw createError;
-          }
-
-          setCanvasId(newCanvas.id);
-        }
+        setCanvas({
+          segmentos: data.segmentos || "",
+          proposta: data.proposta || "",
+          canais: data.canais || "",
+          relacionamento: data.relacionamento || "",
+          atividades: data.atividades || "",
+          recursos: data.recursos || "",
+          parceiros: data.parceiros || "",
+          custos: data.custos || "",
+          receitas: data.receitas || ""
+        });
       } catch (error) {
         console.error("Failed to initialize canvas:", error);
         toast({
@@ -102,20 +75,15 @@ export const useCanvasState = () => {
 
   const saveCanvas = useCallback(
     async (updatedCanvas: CanvasData) => {
-      if (!canvasId) return;
+      if (!organization?.id) return;
 
       try {
         setIsSaving(true);
-        
-        const { error } = await supabase
-          .from("business_model_canvas")
-          .update(updatedCanvas)
-          .eq("id", canvasId);
 
-        if (error) {
-          console.error("Error saving canvas:", error);
-          throw error;
-        }
+        await apiClient.put(
+          `/organizations/${organization.id}/strategic-planning/canvas`,
+          updatedCanvas
+        );
       } catch (error) {
         console.error("Failed to save canvas:", error);
         toast({
@@ -127,14 +95,14 @@ export const useCanvasState = () => {
         setIsSaving(false);
       }
     },
-    [canvasId, toast]
+    [organization?.id, toast]
   );
 
   const updateField = useCallback(
     (field: keyof CanvasData, value: string) => {
       setCanvas((prev) => {
         const updated = { ...prev, [field]: value };
-        
+
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
         }

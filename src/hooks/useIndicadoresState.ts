@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/lib/api-client";
+import { useOrganization } from "@/hooks/useOrganization";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 
 export interface Indicator {
   id?: string;
@@ -12,6 +12,8 @@ export interface Indicator {
   mensal: string;
 }
 
+const DEBOUNCE_MS = 1000;
+
 export const useIndicadoresState = () => {
   const [indicators, setIndicators] = useState<Indicator[]>([
     { nome: "", descricao: "", meta: "", origem: "", mensal: "" }
@@ -19,7 +21,7 @@ export const useIndicadoresState = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
-  const { organization } = useAuth();
+  const { organization } = useOrganization();
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
   const isInitialLoad = useRef(true);
 
@@ -30,13 +32,9 @@ export const useIndicadoresState = () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from("indicators")
-        .select("*")
-        .eq("organization_id", organization.id)
-        .order("created_at", { ascending: true });
-
-      if (error) throw error;
+      const data = await apiClient.get<Indicator[]>(
+        `/organizations/${organization.id}/strategic-planning/indicators`
+      );
 
       if (data && data.length > 0) {
         setIndicators(data.map(item => ({
@@ -66,38 +64,20 @@ export const useIndicadoresState = () => {
 
     setSaving(true);
     try {
-      for (const indicator of indicatorsToSave) {
-        if (indicator.id) {
-          const { error } = await supabase
-            .from("indicators")
-            .update({
-              nome: indicator.nome,
-              descricao: indicator.descricao,
-              meta: indicator.meta,
-              origem: indicator.origem,
-              mensal: indicator.mensal,
-            })
-            .eq("id", indicator.id);
+      const response = await apiClient.put<Indicator[]>(
+        `/organizations/${organization.id}/strategic-planning/indicators`,
+        indicatorsToSave
+      );
 
-          if (error) throw error;
-        } else if (indicator.nome || indicator.descricao || indicator.meta || indicator.origem || indicator.mensal) {
-          const { data, error } = await supabase
-            .from("indicators")
-            .insert([{
-              organization_id: organization.id,
-              session_id: organization.id,
-              nome: indicator.nome,
-              descricao: indicator.descricao,
-              meta: indicator.meta,
-              origem: indicator.origem,
-              mensal: indicator.mensal,
-            }])
-            .select()
-            .single();
-
-          if (error) throw error;
-          indicator.id = data.id;
-        }
+      if (response && response.length > 0) {
+        setIndicators(response.map(item => ({
+          id: item.id,
+          nome: item.nome || "",
+          descricao: item.descricao || "",
+          meta: item.meta || "",
+          origem: item.origem || "",
+          mensal: item.mensal || ""
+        })));
       }
     } catch (error) {
       console.error("Error saving indicators:", error);
@@ -129,14 +109,14 @@ export const useIndicadoresState = () => {
 
   useEffect(() => {
     if (loading || isInitialLoad.current) return;
-    
+
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
     saveTimeoutRef.current = setTimeout(() => {
       saveIndicators(indicators);
-    }, 1000);
+    }, DEBOUNCE_MS);
 
     return () => {
       if (saveTimeoutRef.current) {

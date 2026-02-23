@@ -1,242 +1,17 @@
-import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "@/hooks/use-toast";
-import { 
-  Users, 
-  Building2, 
-  CreditCard, 
-  BarChart3, 
-  ArrowLeft,
-  Search,
-  Edit,
-  Trash2,
-  Crown
-} from "lucide-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-
-interface UserProfile {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-  created_at: string;
-}
-
-interface OrganizationData {
-  id: string;
-  name: string;
-  code: string;
-  created_at: string;
-  member_count?: number;
-}
-
-interface SubscriptionData {
-  id: string;
-  user_id: string;
-  status: string;
-  trial_ends_at: string | null;
-  created_at: string;
-  plan: {
-    name: string;
-    slug: string;
-  };
-  profile?: {
-    email: string | null;
-    full_name: string | null;
-  };
-}
-
-interface PlanData {
-  id: string;
-  name: string;
-  slug: string;
-  max_organizations: number;
-  max_users_per_org: number;
-  price_monthly: number;
-  is_active: boolean;
-}
+import { ArrowLeft, Crown, User, Building2, Shield } from "lucide-react";
 
 export default function Admin() {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
-  const [activeTab, setActiveTab] = useState("metrics");
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [organizations, setOrganizations] = useState<OrganizationData[]>([]);
-  const [subscriptions, setSubscriptions] = useState<SubscriptionData[]>([]);
-  const [plans, setPlans] = useState<PlanData[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, organization, organizations, role, signOut, isSuperAdmin } = useAuth();
 
-  // Metrics
-  const [metrics, setMetrics] = useState({
-    totalUsers: 0,
-    totalOrganizations: 0,
-    activeSubscriptions: 0,
-    trialUsers: 0,
-  });
-
-  useEffect(() => {
-    fetchAllData();
-  }, []);
-
-  const fetchAllData = async () => {
-    setIsLoading(true);
-    await Promise.all([
-      fetchUsers(),
-      fetchOrganizations(),
-      fetchSubscriptions(),
-      fetchPlans(),
-    ]);
-    setIsLoading(false);
-  };
-
-  const fetchUsers = async () => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, full_name, email, created_at")
-      .order("created_at", { ascending: false });
-
-    if (!error && data) {
-      setUsers(data);
-      setMetrics(prev => ({ ...prev, totalUsers: data.length }));
-    }
-  };
-
-  const fetchOrganizations = async () => {
-    const { data, error } = await supabase
-      .from("organizations")
-      .select("id, name, code, created_at")
-      .order("created_at", { ascending: false });
-
-    if (!error && data) {
-      // Get member counts for each org
-      const orgsWithCounts = await Promise.all(
-        data.map(async (org) => {
-          const { count } = await supabase
-            .from("user_organizations")
-            .select("*", { count: "exact", head: true })
-            .eq("organization_id", org.id);
-          return { ...org, member_count: count || 0 };
-        })
-      );
-      setOrganizations(orgsWithCounts);
-      setMetrics(prev => ({ ...prev, totalOrganizations: data.length }));
-    }
-  };
-
-  const fetchSubscriptions = async () => {
-    const { data, error } = await supabase
-      .from("subscriptions")
-      .select(`
-        id,
-        user_id,
-        status,
-        trial_ends_at,
-        created_at,
-        plan:plans(name, slug)
-      `)
-      .order("created_at", { ascending: false });
-
-    if (!error && data) {
-      // Fetch profile info for each subscription
-      const subsWithProfiles = await Promise.all(
-        data.map(async (sub) => {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("email, full_name")
-            .eq("id", sub.user_id)
-            .maybeSingle();
-          return { 
-            ...sub, 
-            profile,
-            plan: sub.plan as unknown as { name: string; slug: string }
-          };
-        })
-      );
-      setSubscriptions(subsWithProfiles);
-      setMetrics(prev => ({
-        ...prev,
-        activeSubscriptions: data.filter(s => s.status === "active").length,
-        trialUsers: data.filter(s => s.status === "trialing").length,
-      }));
-    }
-  };
-
-  const fetchPlans = async () => {
-    const { data, error } = await supabase
-      .from("plans")
-      .select("*")
-      .order("price_monthly", { ascending: true });
-
-    if (!error && data) {
-      setPlans(data);
-    }
-  };
-
-  const updateSubscriptionStatus = async (subscriptionId: string, newStatus: string) => {
-    const { error } = await supabase
-      .from("subscriptions")
-      .update({ status: newStatus })
-      .eq("id", subscriptionId);
-
-    if (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível atualizar a assinatura.",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Sucesso",
-        description: "Assinatura atualizada com sucesso.",
-      });
-      fetchSubscriptions();
-    }
-  };
-
-  const deleteOrganization = async (orgId: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta organização? Esta ação não pode ser desfeita.")) {
-      return;
-    }
-
-    const { error } = await supabase
-      .from("organizations")
-      .delete()
-      .eq("id", orgId);
-
-    if (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível excluir a organização.",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Sucesso",
-        description: "Organização excluída com sucesso.",
-      });
-      fetchOrganizations();
-    }
-  };
-
-  const filteredUsers = users.filter(
-    u => u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-         u.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const filteredOrganizations = organizations.filter(
-    o => o.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-         o.code.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -249,7 +24,7 @@ export default function Admin() {
             </Button>
             <div className="flex items-center gap-2">
               <Crown className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-bold">Admin do Sistema</h1>
+              <h1 className="text-xl font-bold">Painel Administrativo</h1>
             </div>
           </div>
           <Button variant="outline" onClick={signOut}>
@@ -259,267 +34,122 @@ export default function Admin() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 mb-8">
-            <TabsTrigger value="metrics" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Métricas
-            </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Usuários
-            </TabsTrigger>
-            <TabsTrigger value="organizations" className="flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
-              Empresas
-            </TabsTrigger>
-            <TabsTrigger value="subscriptions" className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Assinaturas
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Metrics Tab */}
-          <TabsContent value="metrics">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription>Total de Usuários</CardDescription>
-                  <CardTitle className="text-3xl">{metrics.totalUsers}</CardTitle>
-                </CardHeader>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription>Total de Empresas</CardDescription>
-                  <CardTitle className="text-3xl">{metrics.totalOrganizations}</CardTitle>
-                </CardHeader>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription>Assinaturas Ativas</CardDescription>
-                  <CardTitle className="text-3xl">{metrics.activeSubscriptions}</CardTitle>
-                </CardHeader>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription>Em Trial</CardDescription>
-                  <CardTitle className="text-3xl">{metrics.trialUsers}</CardTitle>
-                </CardHeader>
-              </Card>
-            </div>
-
-            <div className="mt-8">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Planos Disponíveis</CardTitle>
-                  <CardDescription>Gerencie os planos do sistema</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Slug</TableHead>
-                        <TableHead>Max Empresas</TableHead>
-                        <TableHead>Max Usuários/Empresa</TableHead>
-                        <TableHead>Preço Mensal</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {plans.map((plan) => (
-                        <TableRow key={plan.id}>
-                          <TableCell className="font-medium">{plan.name}</TableCell>
-                          <TableCell>{plan.slug}</TableCell>
-                          <TableCell>{plan.max_organizations}</TableCell>
-                          <TableCell>{plan.max_users_per_org}</TableCell>
-                          <TableCell>R$ {plan.price_monthly}</TableCell>
-                          <TableCell>
-                            <Badge variant={plan.is_active ? "default" : "secondary"}>
-                              {plan.is_active ? "Ativo" : "Inativo"}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Users Tab */}
-          <TabsContent value="users">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Usuários</CardTitle>
-                    <CardDescription>Todos os usuários do sistema</CardDescription>
-                  </div>
-                  <div className="relative w-64">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Buscar usuários..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {/* User Info Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Informacoes do Usuario
+              </CardTitle>
+              <CardDescription>Seus dados de acesso</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <p className="text-sm text-muted-foreground">Nome</p>
+                <p className="font-medium">{user.fullName || "Nao informado"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Email</p>
+                <p className="font-medium">{user.email}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Status</p>
+                <div className="flex gap-2 mt-1">
+                  {isSuperAdmin && (
+                    <Badge variant="default">
+                      <Shield className="h-3 w-3 mr-1" />
+                      Super Admin
+                    </Badge>
+                  )}
+                  {role && (
+                    <Badge variant="secondary">{role}</Badge>
+                  )}
                 </div>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Criado em</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.full_name || "-"}</TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>
-                          {format(new Date(user.created_at), "dd/MM/yyyy", { locale: ptBR })}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Organizations Tab */}
-          <TabsContent value="organizations">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
+          {/* Organization Info Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Organizacao Atual
+              </CardTitle>
+              <CardDescription>Empresa selecionada</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {organization ? (
+                <>
                   <div>
-                    <CardTitle>Empresas</CardTitle>
-                    <CardDescription>Todas as empresas cadastradas</CardDescription>
+                    <p className="text-sm text-muted-foreground">Nome</p>
+                    <p className="font-medium">{organization.name}</p>
                   </div>
-                  <div className="relative w-64">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Buscar empresas..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Codigo</p>
+                    <Badge variant="outline">{organization.code}</Badge>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Código</TableHead>
-                      <TableHead>Membros</TableHead>
-                      <TableHead>Criado em</TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredOrganizations.map((org) => (
-                      <TableRow key={org.id}>
-                        <TableCell className="font-medium">{org.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{org.code}</Badge>
-                        </TableCell>
-                        <TableCell>{org.member_count}</TableCell>
-                        <TableCell>
-                          {format(new Date(org.created_at), "dd/MM/yyyy", { locale: ptBR })}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => deleteOrganization(org.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Seu Papel</p>
+                    <Badge variant="secondary">{organization.role}</Badge>
+                  </div>
+                  {organization.isOwner && (
+                    <Badge variant="default">Proprietario</Badge>
+                  )}
+                </>
+              ) : (
+                <p className="text-muted-foreground">Nenhuma organizacao selecionada</p>
+              )}
+            </CardContent>
+          </Card>
 
-          {/* Subscriptions Tab */}
-          <TabsContent value="subscriptions">
-            <Card>
-              <CardHeader>
-                <CardTitle>Assinaturas</CardTitle>
-                <CardDescription>Gerenciar assinaturas dos usuários</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Usuário</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Plano</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Trial Expira</TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {subscriptions.map((sub) => (
-                      <TableRow key={sub.id}>
-                        <TableCell className="font-medium">
-                          {sub.profile?.full_name || "-"}
-                        </TableCell>
-                        <TableCell>{sub.profile?.email || "-"}</TableCell>
-                        <TableCell>
-                          <Badge>{sub.plan?.name}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              sub.status === "active" ? "default" :
-                              sub.status === "trialing" ? "secondary" : "destructive"
-                            }
-                          >
-                            {sub.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {sub.trial_ends_at
-                            ? format(new Date(sub.trial_ends_at), "dd/MM/yyyy", { locale: ptBR })
-                            : "-"}
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={sub.status}
-                            onValueChange={(value) => updateSubscriptionStatus(sub.id, value)}
-                          >
-                            <SelectTrigger className="w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="trialing">trialing</SelectItem>
-                              <SelectItem value="active">active</SelectItem>
-                              <SelectItem value="canceled">canceled</SelectItem>
-                              <SelectItem value="expired">expired</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          {/* Organizations List Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Suas Organizacoes</CardTitle>
+              <CardDescription>
+                {organizations.length} organizacao(oes) vinculada(s)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {organizations.length === 0 ? (
+                <p className="text-muted-foreground text-sm">Nenhuma organizacao encontrada</p>
+              ) : (
+                <div className="space-y-2">
+                  {organizations.map((org) => (
+                    <div
+                      key={org.id}
+                      className={`flex items-center justify-between p-2 rounded-lg border ${
+                        org.id === organization?.id
+                          ? "bg-primary/5 border-primary/30"
+                          : "bg-muted/30"
+                      }`}
+                    >
+                      <div>
+                        <p className="font-medium text-sm">{org.name}</p>
+                        <p className="text-xs text-muted-foreground">{org.code}</p>
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        {org.role}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Development Notice */}
+        <Card className="mt-6">
+          <CardContent className="py-6">
+            <p className="text-center text-muted-foreground">
+              Funcionalidades administrativas avancadas (gestao de usuarios, empresas, assinaturas)
+              estao em desenvolvimento e serao disponibilizadas em breve.
+            </p>
+          </CardContent>
+        </Card>
       </main>
     </div>
   );

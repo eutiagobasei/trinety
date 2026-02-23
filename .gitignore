@@ -1,3 +1,13 @@
+# Dependencies
+node_modules
+backend/node_modules
+
+# Build outputs
+dist
+dist-ssr
+backend/dist
+build
+
 # Logs
 logs
 *.log
@@ -7,9 +17,11 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Environment variables (IMPORTANT: never commit these!)
+.env
+.env.local
+.env.*.local
+backend/.env
 *.local
 
 # Editor directories and files
@@ -22,3 +34,18 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+postgres_data/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Misc
+*.tsbuildinfo
+.eslintcache

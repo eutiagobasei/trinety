@@ -1,73 +1,202 @@
-# Welcome to your Lovable project
+# Trinety - Plataforma de Planejamento Estratégico
 
-## Project info
+Sistema de planejamento estratégico empresarial com geração assistida por IA.
 
-**URL**: https://lovable.dev/projects/5194d28e-f222-4bbc-a636-d0c2f9adb4c5
+## Stack Tecnológica
 
-## How can I edit this code?
+### Frontend
+- **React 18** + TypeScript
+- **Vite** (bundler)
+- **TailwindCSS** + shadcn/ui
+- **React Query** (gerenciamento de estado)
+- **React Router** (navegação)
 
-There are several ways of editing your application.
+### Backend
+- **NestJS** (Node.js)
+- **TypeORM** (ORM)
+- **PostgreSQL** (banco de dados)
+- **JWT** (autenticação)
+- **OpenAI GPT-4** (geração de conteúdo)
 
-**Use Lovable**
+## Pré-requisitos
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/5194d28e-f222-4bbc-a636-d0c2f9adb4c5) and start prompting.
+- Node.js 20+
+- Docker e Docker Compose
+- Chave de API da OpenAI
 
-Changes made via Lovable will be committed automatically to this repo.
+## Configuração Inicial
 
-**Use your preferred IDE**
+### 1. Clonar o repositório
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+```bash
+git clone https://github.com/eutiagobasei/trinety.git
+cd trinety
+```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 2. Configurar variáveis de ambiente
 
-Follow these steps:
+**Backend** (`backend/.env`):
+```env
+PORT=3000
+NODE_ENV=development
+FRONTEND_URL=http://localhost:8080
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=trinety
+DB_PASSWORD=trinety
+DB_DATABASE=trinety
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+JWT_SECRET=sua-chave-secreta-aqui
+JWT_EXPIRES_IN=7d
 
-# Step 3: Install the necessary dependencies.
-npm i
+OPENAI_API_KEY=sua-chave-openai-aqui
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+**Frontend** (`.env`):
+```env
+VITE_API_URL=http://localhost:3000/api
+```
+
+### 3. Iniciar o ambiente de desenvolvimento
+
+**Opção 1: Script automatizado**
+```bash
+./scripts/start-dev.sh
+```
+
+**Opção 2: Manualmente**
+
+```bash
+# Terminal 1 - Iniciar PostgreSQL
+docker-compose up -d postgres
+
+# Terminal 2 - Iniciar backend
+cd backend
+npm install
+npm run dev
+
+# Terminal 3 - Iniciar frontend
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### 4. Acessar a aplicação
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- **Frontend**: http://localhost:8080
+- **Backend API**: http://localhost:3000/api
+- **PostgreSQL**: localhost:5432 (usuário: trinety, senha: trinety)
 
-**Use GitHub Codespaces**
+## Estrutura do Projeto
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```
+trinety/
+├── backend/                 # API NestJS
+│   ├── src/
+│   │   ├── auth/           # Autenticação JWT
+│   │   ├── users/          # Gerenciamento de usuários
+│   │   ├── organizations/  # Multi-tenancy
+│   │   ├── diagnostic/     # Diagnóstico empresarial
+│   │   ├── strategic-planning/  # Planejamento estratégico
+│   │   └── database/
+│   │       └── entities/   # Entidades TypeORM
+│   └── package.json
+├── src/                     # Frontend React
+│   ├── components/         # Componentes React
+│   ├── contexts/           # Context API
+│   ├── hooks/              # Custom hooks
+│   ├── lib/                # Utilitários
+│   └── pages/              # Páginas da aplicação
+├── docker-compose.yml      # Orquestração de containers
+└── package.json
+```
 
-## What technologies are used for this project?
+## Funcionalidades
 
-This project is built with:
+### Autenticação e Multi-tenancy
+- Cadastro e login de usuários
+- Múltiplas organizações por usuário
+- Controle de acesso baseado em papéis (admin, gestor, usuário)
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Diagnóstico Empresarial
+- 27 perguntas organizadas em 10 blocos
+- Salva respostas automaticamente
+- Base para geração do plano estratégico
 
-## How can I deploy this project?
+### Planejamento Estratégico (gerado por IA)
+- Business Model Canvas
+- Mapa de Empatia
+- Análise SWOT
+- Filosofia (Missão, Visão, Valores)
+- OKRs
+- Indicadores/KPIs
+- Plano de Ação
+- Rotinas de Gestão
 
-Simply open [Lovable](https://lovable.dev/projects/5194d28e-f222-4bbc-a636-d0c2f9adb4c5) and click on Share -> Publish.
+## API Endpoints
 
-## Can I connect a custom domain to my Lovable project?
+### Autenticação
+- `POST /api/auth/signup` - Cadastro
+- `POST /api/auth/signin` - Login
+- `GET /api/auth/profile` - Perfil do usuário
+- `POST /api/auth/switch-organization` - Trocar organização
 
-Yes, you can!
+### Organizações
+- `POST /api/organizations` - Criar organização
+- `GET /api/organizations/:id/members` - Listar membros
+- `POST /api/organizations/:id/members` - Adicionar membro
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### Diagnóstico
+- `GET /api/organizations/:orgId/diagnostic` - Obter diagnóstico
+- `POST /api/organizations/:orgId/diagnostic/answers` - Salvar resposta
+- `POST /api/organizations/:orgId/diagnostic/complete` - Concluir
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### Planejamento Estratégico
+- `POST /api/organizations/:orgId/strategic-planning/generate` - Gerar plano
+- `GET /api/organizations/:orgId/strategic-planning/canvas` - Business Canvas
+- `GET /api/organizations/:orgId/strategic-planning/swot` - SWOT
+- ... (demais endpoints)
+
+## Scripts Disponíveis
+
+### Frontend
+```bash
+npm run dev      # Desenvolvimento
+npm run build    # Build de produção
+npm run preview  # Preview do build
+```
+
+### Backend
+```bash
+npm run dev      # Desenvolvimento com hot-reload
+npm run build    # Compilar TypeScript
+npm run start    # Iniciar em produção
+```
+
+## Docker
+
+```bash
+# Subir todos os serviços
+docker-compose up -d
+
+# Parar serviços
+docker-compose down
+
+# Ver logs
+docker-compose logs -f
+
+# Apenas banco de dados
+docker-compose up -d postgres
+```
+
+## Contribuição
+
+1. Fork o projeto
+2. Crie uma branch (`git checkout -b feature/nova-funcionalidade`)
+3. Commit suas mudanças (`git commit -m 'feat: adiciona nova funcionalidade'`)
+4. Push para a branch (`git push origin feature/nova-funcionalidade`)
+5. Abra um Pull Request
+
+## Licença
+
+Proprietário - Todos os direitos reservados.

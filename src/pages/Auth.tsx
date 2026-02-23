@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,8 +18,8 @@ export default function Auth() {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupName, setSignupName] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
-  
-  const { signIn, signUp, user } = useAuth();
+
+  const { signIn, signUp, user, organization } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -29,25 +28,14 @@ export default function Auth() {
 
   // Redirect if already logged in
   useEffect(() => {
-    const checkAndRedirect = async () => {
-      if (!user) return;
-      
-      // Check subscription status
-      const { data: subscription } = await supabase
-        .from("subscriptions")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      
-      if (!subscription) {
-        navigate("/escolher-plano", { replace: true });
+    if (user) {
+      if (!organization) {
+        navigate("/criar-empresa", { replace: true });
       } else {
         navigate(from, { replace: true });
       }
-    };
-    
-    checkAndRedirect();
-  }, [user, navigate, from]);
+    }
+  }, [user, organization, navigate, from]);
 
   if (user) {
     return null;
@@ -55,7 +43,7 @@ export default function Auth() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!loginEmail || !loginPassword) {
       toast({
         title: "Campos obrigatórios",
@@ -72,20 +60,18 @@ export default function Auth() {
     if (error) {
       toast({
         title: "Erro ao entrar",
-        description: error.message === "Invalid login credentials" 
-          ? "Email ou senha incorretos." 
+        description: error.message === "Invalid login credentials"
+          ? "Email ou senha incorretos."
           : error.message,
         variant: "destructive",
       });
       return;
     }
-
-    navigate(from, { replace: true });
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!signupEmail || !signupPassword || !signupName) {
       toast({
         title: "Campos obrigatórios",
@@ -118,7 +104,7 @@ export default function Auth() {
     setIsLoading(false);
 
     if (error) {
-      if (error.message.includes("already registered")) {
+      if (error.message.includes("already") || error.message.includes("uso")) {
         toast({
           title: "Email já cadastrado",
           description: "Este email já está em uso. Tente fazer login.",
@@ -138,8 +124,8 @@ export default function Auth() {
       title: "Conta criada!",
       description: "Bem-vindo ao Trinity Hub.",
     });
-    
-    navigate("/escolher-plano", { replace: true });
+
+    navigate("/criar-empresa", { replace: true });
   };
 
   return (
@@ -160,7 +146,7 @@ export default function Auth() {
               <TabsTrigger value="login">Entrar</TabsTrigger>
               <TabsTrigger value="signup">Cadastrar</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
@@ -197,7 +183,7 @@ export default function Auth() {
                 </Button>
               </form>
             </TabsContent>
-            
+
             <TabsContent value="signup">
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="space-y-2">

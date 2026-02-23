@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/lib/api-client";
+import { useOrganization } from "@/hooks/useOrganization";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 
 interface SwotState {
   forcas: string;
@@ -15,7 +15,7 @@ const DEBOUNCE_MS = 1000;
 
 export const useSwotState = () => {
   const { toast } = useToast();
-  const { organization } = useAuth();
+  const { organization } = useOrganization();
   const [swot, setSwot] = useState<SwotState>({
     forcas: "",
     fraquezas: "",
@@ -25,7 +25,6 @@ export const useSwotState = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [recordId, setRecordId] = useState<string | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
@@ -36,24 +35,17 @@ export const useSwotState = () => {
 
     const loadSwot = async () => {
       try {
-        const { data, error } = await supabase
-          .from("swot_analysis")
-          .select("*")
-          .eq("organization_id", organization.id)
-          .maybeSingle();
+        const data = await apiClient.get<SwotState>(
+          `/organizations/${organization.id}/strategic-planning/swot`
+        );
 
-        if (error) throw error;
-
-        if (data) {
-          setRecordId(data.id);
-          setSwot({
-            forcas: data.forcas || "",
-            fraquezas: data.fraquezas || "",
-            oportunidades: data.oportunidades || "",
-            ameacas: data.ameacas || "",
-            combinacoes: data.combinacoes || "",
-          });
-        }
+        setSwot({
+          forcas: data.forcas || "",
+          fraquezas: data.fraquezas || "",
+          oportunidades: data.oportunidades || "",
+          ameacas: data.ameacas || "",
+          combinacoes: data.combinacoes || "",
+        });
       } catch (error) {
         console.error("Error loading SWOT:", error);
         toast({
@@ -76,25 +68,10 @@ export const useSwotState = () => {
       try {
         setIsSaving(true);
 
-        const { error } = await supabase
-          .from("swot_analysis")
-          .upsert(
-            {
-              organization_id: organization.id,
-              session_id: organization.id,
-              forcas: data.forcas,
-              fraquezas: data.fraquezas,
-              oportunidades: data.oportunidades,
-              ameacas: data.ameacas,
-              combinacoes: data.combinacoes,
-              updated_at: new Date().toISOString(),
-            },
-            {
-              onConflict: "organization_id",
-            }
-          );
-
-        if (error) throw error;
+        await apiClient.put(
+          `/organizations/${organization.id}/strategic-planning/swot`,
+          data
+        );
       } catch (error) {
         console.error("Error saving SWOT:", error);
         toast({

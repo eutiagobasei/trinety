@@ -11,9 +11,7 @@ export function useOrganization() {
   const canEdit = isAdmin || isGestor;
   const canView = true;
 
-  // Check if user is owner of current organization
-  const currentUserOrg = organizations.find(uo => uo.organization_id === organization?.id);
-  const isOwner = currentUserOrg?.is_owner ?? false;
+  const isOwner = organization?.isOwner ?? false;
 
   return {
     organization,
