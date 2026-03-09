@@ -177,59 +177,119 @@ export class StrategicPlanningService {
 
   async getCanvas(organizationId: string, userId: string) {
     await this.organizationsService.checkAccess(userId, organizationId);
-    return this.canvasRepository.findOne({ where: { organizationId } });
+    const canvas = await this.canvasRepository.findOne({ where: { organizationId } });
+    return canvas || {
+      segmentos: '',
+      proposta: '',
+      canais: '',
+      relacionamento: '',
+      atividades: '',
+      recursos: '',
+      parceiros: '',
+      custos: '',
+      receitas: '',
+    };
   }
 
   async updateCanvas(organizationId: string, userId: string, data: Partial<BusinessModelCanvas>) {
     await this.organizationsService.checkAccess(userId, organizationId);
-    const canvas = await this.canvasRepository.findOne({ where: { organizationId } });
-    if (!canvas) throw new NotFoundException('Canvas não encontrado');
-    Object.assign(canvas, data);
+    let canvas = await this.canvasRepository.findOne({ where: { organizationId } });
+    if (!canvas) {
+      canvas = this.canvasRepository.create({
+        organizationId,
+        sessionId: uuidv4(),
+        ...data,
+      });
+    } else {
+      Object.assign(canvas, data);
+    }
     return this.canvasRepository.save(canvas);
   }
 
   async getEmpathyMap(organizationId: string, userId: string) {
     await this.organizationsService.checkAccess(userId, organizationId);
-    return this.empathyRepository.findOne({ where: { organizationId } });
+    const empathy = await this.empathyRepository.findOne({ where: { organizationId } });
+    return empathy || {
+      oQueVe: '',
+      oQueOuve: '',
+      oQuePensa: '',
+      oQueFala: '',
+      dores: '',
+      ganhos: '',
+    };
   }
 
   async updateEmpathyMap(organizationId: string, userId: string, data: Partial<EmpathyMap>) {
     await this.organizationsService.checkAccess(userId, organizationId);
-    const empathy = await this.empathyRepository.findOne({ where: { organizationId } });
-    if (!empathy) throw new NotFoundException('Mapa de Empatia não encontrado');
-    Object.assign(empathy, data);
+    let empathy = await this.empathyRepository.findOne({ where: { organizationId } });
+    if (!empathy) {
+      empathy = this.empathyRepository.create({
+        organizationId,
+        sessionId: uuidv4(),
+        ...data,
+      });
+    } else {
+      Object.assign(empathy, data);
+    }
     return this.empathyRepository.save(empathy);
   }
 
   async getSwot(organizationId: string, userId: string) {
     await this.organizationsService.checkAccess(userId, organizationId);
-    return this.swotRepository.findOne({ where: { organizationId } });
+    const swot = await this.swotRepository.findOne({ where: { organizationId } });
+    return swot || {
+      forcas: '',
+      fraquezas: '',
+      oportunidades: '',
+      ameacas: '',
+    };
   }
 
   async updateSwot(organizationId: string, userId: string, data: Partial<SwotAnalysis>) {
     await this.organizationsService.checkAccess(userId, organizationId);
-    const swot = await this.swotRepository.findOne({ where: { organizationId } });
-    if (!swot) throw new NotFoundException('SWOT não encontrado');
-    Object.assign(swot, data);
+    let swot = await this.swotRepository.findOne({ where: { organizationId } });
+    if (!swot) {
+      swot = this.swotRepository.create({
+        organizationId,
+        sessionId: uuidv4(),
+        ...data,
+      });
+    } else {
+      Object.assign(swot, data);
+    }
     return this.swotRepository.save(swot);
   }
 
   async getFilosofia(organizationId: string, userId: string) {
     await this.organizationsService.checkAccess(userId, organizationId);
-    return this.filosofiaRepository.findOne({ where: { organizationId } });
+    const filosofia = await this.filosofiaRepository.findOne({ where: { organizationId } });
+    return filosofia || {
+      missao: '',
+      visao: '',
+      valores: '',
+      proposito: '',
+    };
   }
 
   async updateFilosofia(organizationId: string, userId: string, data: Partial<Filosofia>) {
     await this.organizationsService.checkAccess(userId, organizationId);
-    const filosofia = await this.filosofiaRepository.findOne({ where: { organizationId } });
-    if (!filosofia) throw new NotFoundException('Filosofia não encontrada');
-    Object.assign(filosofia, data);
+    let filosofia = await this.filosofiaRepository.findOne({ where: { organizationId } });
+    if (!filosofia) {
+      filosofia = this.filosofiaRepository.create({
+        organizationId,
+        sessionId: uuidv4(),
+        ...data,
+      });
+    } else {
+      Object.assign(filosofia, data);
+    }
     return this.filosofiaRepository.save(filosofia);
   }
 
   async getOkrs(organizationId: string, userId: string) {
     await this.organizationsService.checkAccess(userId, organizationId);
-    return this.okrRepository.find({ where: { organizationId } });
+    const okrs = await this.okrRepository.find({ where: { organizationId } });
+    return okrs.length > 0 ? okrs : [];
   }
 
   async updateOkr(organizationId: string, userId: string, okrId: string, data: Partial<Okr>) {
@@ -240,9 +300,25 @@ export class StrategicPlanningService {
     return this.okrRepository.save(okr);
   }
 
+  async updateAllOkrs(organizationId: string, userId: string, data: Array<{ id?: string; objetivo: string; krs: string }>) {
+    await this.organizationsService.checkAccess(userId, organizationId);
+    await this.okrRepository.delete({ organizationId });
+    const sessionId = uuidv4();
+    const okrs = data.map((o) =>
+      this.okrRepository.create({
+        sessionId,
+        organizationId,
+        objetivo: o.objetivo,
+        krs: o.krs,
+      }),
+    );
+    return this.okrRepository.save(okrs);
+  }
+
   async getIndicators(organizationId: string, userId: string) {
     await this.organizationsService.checkAccess(userId, organizationId);
-    return this.indicatorRepository.find({ where: { organizationId } });
+    const indicators = await this.indicatorRepository.find({ where: { organizationId } });
+    return indicators.length > 0 ? indicators : [];
   }
 
   async updateIndicator(organizationId: string, userId: string, indicatorId: string, data: Partial<Indicator>) {
@@ -253,9 +329,28 @@ export class StrategicPlanningService {
     return this.indicatorRepository.save(indicator);
   }
 
+  async updateAllIndicators(organizationId: string, userId: string, data: Array<{ id?: string; nome: string; descricao: string; meta: string; origem: string; mensal?: string }>) {
+    await this.organizationsService.checkAccess(userId, organizationId);
+    await this.indicatorRepository.delete({ organizationId });
+    const sessionId = uuidv4();
+    const indicators = data.map((i) =>
+      this.indicatorRepository.create({
+        sessionId,
+        organizationId,
+        nome: i.nome,
+        descricao: i.descricao,
+        meta: i.meta,
+        origem: i.origem,
+        mensal: i.mensal || '',
+      }),
+    );
+    return this.indicatorRepository.save(indicators);
+  }
+
   async getActionPlan(organizationId: string, userId: string) {
     await this.organizationsService.checkAccess(userId, organizationId);
-    return this.actionPlanRepository.find({ where: { organizationId } });
+    const actions = await this.actionPlanRepository.find({ where: { organizationId } });
+    return actions.length > 0 ? actions : [];
   }
 
   async updateAction(organizationId: string, userId: string, actionId: string, data: Partial<ActionPlan>) {
@@ -266,16 +361,49 @@ export class StrategicPlanningService {
     return this.actionPlanRepository.save(action);
   }
 
+  async updateAllActions(organizationId: string, userId: string, data: Array<{ id?: string; acao: string; origem: string; responsavel: string; prazo: string; status?: string; obs?: string }>) {
+    await this.organizationsService.checkAccess(userId, organizationId);
+    await this.actionPlanRepository.delete({ organizationId });
+    const sessionId = uuidv4();
+    const actions = data.map((a) =>
+      this.actionPlanRepository.create({
+        sessionId,
+        organizationId,
+        acao: a.acao,
+        origem: a.origem,
+        responsavel: a.responsavel,
+        prazo: a.prazo,
+        status: a.status || 'Não iniciado',
+        obs: a.obs || '',
+      }),
+    );
+    return this.actionPlanRepository.save(actions);
+  }
+
   async getRoutines(organizationId: string, userId: string) {
     await this.organizationsService.checkAccess(userId, organizationId);
-    return this.routineRepository.findOne({ where: { organizationId } });
+    const routine = await this.routineRepository.findOne({ where: { organizationId } });
+    return routine || {
+      diaria: '',
+      semanal: '',
+      mensal: '',
+      trimestral: '',
+      anual: '',
+    };
   }
 
   async updateRoutines(organizationId: string, userId: string, data: Partial<ManagementRoutine>) {
     await this.organizationsService.checkAccess(userId, organizationId);
-    const routine = await this.routineRepository.findOne({ where: { organizationId } });
-    if (!routine) throw new NotFoundException('Rotinas não encontradas');
-    Object.assign(routine, data);
+    let routine = await this.routineRepository.findOne({ where: { organizationId } });
+    if (!routine) {
+      routine = this.routineRepository.create({
+        organizationId,
+        sessionId: uuidv4(),
+        ...data,
+      });
+    } else {
+      Object.assign(routine, data);
+    }
     return this.routineRepository.save(routine);
   }
 }

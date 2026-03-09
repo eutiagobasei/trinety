@@ -29,8 +29,8 @@ export class Indicator {
   @Column({ type: 'text', nullable: true })
   origem: string;
 
-  @Column({ type: 'boolean', default: false })
-  mensal: boolean;
+  @Column({ type: 'text', nullable: true })
+  mensal: string;
 
   @Column({ name: 'organization_id' })
   organizationId: string;

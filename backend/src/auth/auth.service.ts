@@ -4,17 +4,32 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../database/entities/user.entity';
-import { UserOrganization, AppRole } from '../database/entities/user-organization.entity';
+import { UserOrganization } from '../database/entities/user-organization.entity';
 import { Organization } from '../database/entities/organization.entity';
 import { SignUpDto, SignInDto, AuthResponse } from './dto/auth.dto';
 
+export interface TokenPayload {
+  sub: string;
+  email: string;
+  isSystemAdmin: boolean;
+}
+
+export interface Tokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
 @Injectable()
 export class AuthService {
+  private readonly accessTokenExpiry: string;
+  private readonly refreshTokenExpiry: string;
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -23,28 +38,35 @@ export class AuthService {
     @InjectRepository(Organization)
     private readonly orgRepository: Repository<Organization>,
     private readonly jwtService: JwtService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.accessTokenExpiry = this.configService.get('JWT_EXPIRES_IN', '15m');
+    this.refreshTokenExpiry = this.configService.get('JWT_REFRESH_EXPIRES_IN', '7d');
+  }
 
   async signUp(dto: SignUpDto): Promise<AuthResponse> {
     const existingUser = await this.userRepository.findOne({
-      where: { email: dto.email },
+      where: { email: dto.email.toLowerCase().trim() },
     });
 
     if (existingUser) {
       throw new ConflictException('Email já está em uso');
     }
 
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    // Validate password strength
+    this.validatePasswordStrength(dto.password);
+
+    const hashedPassword = await bcrypt.hash(dto.password, 12);
 
     const user = this.userRepository.create({
-      email: dto.email,
+      email: dto.email.toLowerCase().trim(),
       password: hashedPassword,
-      fullName: dto.fullName,
+      fullName: dto.fullName?.trim() || '',
     });
 
     await this.userRepository.save(user);
 
-    const tokens = await this.generateTokens(user);
+    const tokens = this.generateTokens(user);
 
     return {
       user: this.sanitizeUser(user),
@@ -54,11 +76,13 @@ export class AuthService {
 
   async signIn(dto: SignInDto): Promise<AuthResponse> {
     const user = await this.userRepository.findOne({
-      where: { email: dto.email },
+      where: { email: dto.email.toLowerCase().trim() },
       relations: ['activeOrganization'],
     });
 
     if (!user) {
+      // Use constant-time comparison to prevent timing attacks
+      await bcrypt.compare(dto.password, '$2a$12$invalid.hash.for.timing.attack.prevention');
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
@@ -68,7 +92,7 @@ export class AuthService {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
-    const tokens = await this.generateTokens(user);
+    const tokens = this.generateTokens(user);
 
     return {
       user: this.sanitizeUser(user),
@@ -78,7 +102,7 @@ export class AuthService {
 
   async validateUser(email: string, password: string): Promise<User | null> {
     const user = await this.userRepository.findOne({
-      where: { email },
+      where: { email: email.toLowerCase().trim() },
     });
 
     if (user && (await bcrypt.compare(password, user.password))) {
@@ -137,7 +161,7 @@ export class AuthService {
     };
   }
 
-  async refreshToken(userId: string): Promise<{ accessToken: string }> {
+  async refreshToken(userId: string): Promise<Tokens> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
     });
@@ -146,25 +170,41 @@ export class AuthService {
       throw new UnauthorizedException('Usuário não encontrado');
     }
 
-    const accessToken = this.jwtService.sign({
-      sub: user.id,
-      email: user.email,
-    });
-
-    return { accessToken };
+    return this.generateTokens(user);
   }
 
-  private async generateTokens(user: User) {
-    const payload = {
+  generateTokens(user: User): Tokens {
+    const payload: TokenPayload = {
       sub: user.id,
       email: user.email,
       isSystemAdmin: user.isSystemAdmin,
     };
 
-    const accessToken = this.jwtService.sign(payload);
-    const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
+    const accessToken = this.jwtService.sign(payload as any, {
+      expiresIn: this.accessTokenExpiry as any,
+    });
+
+    const refreshToken = this.jwtService.sign(payload as any, {
+      expiresIn: this.refreshTokenExpiry as any,
+    });
 
     return { accessToken, refreshToken };
+  }
+
+  private validatePasswordStrength(password: string): void {
+    if (password.length < 8) {
+      throw new ConflictException('Senha deve ter pelo menos 8 caracteres');
+    }
+
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+
+    if (!hasUppercase || !hasLowercase || !hasNumber) {
+      throw new ConflictException(
+        'Senha deve conter pelo menos uma letra maiúscula, uma minúscula e um número',
+      );
+    }
   }
 
   private sanitizeUser(user: User) {

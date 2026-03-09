@@ -6,6 +6,7 @@ import {
   ManyToOne,
   JoinColumn,
   Unique,
+  Index,
 } from 'typeorm';
 import { User } from './user.entity';
 import { Organization } from './organization.entity';
@@ -23,9 +24,11 @@ export class UserOrganization {
   id: string;
 
   @Column({ name: 'user_id' })
+  @Index('idx_user_organizations_user_id')
   userId: string;
 
   @Column({ name: 'organization_id' })
+  @Index('idx_user_organizations_organization_id')
   organizationId: string;
 
   @Column({

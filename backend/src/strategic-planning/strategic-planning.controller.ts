@@ -71,6 +71,11 @@ export class StrategicPlanningController {
     return this.planningService.getOkrs(orgId, req.user.userId);
   }
 
+  @Put('okrs')
+  async updateAllOkrs(@Param('orgId') orgId: string, @Body() data: any[], @Request() req) {
+    return this.planningService.updateAllOkrs(orgId, req.user.userId, data);
+  }
+
   @Put('okrs/:okrId')
   async updateOkr(
     @Param('orgId') orgId: string,
@@ -87,6 +92,11 @@ export class StrategicPlanningController {
     return this.planningService.getIndicators(orgId, req.user.userId);
   }
 
+  @Put('indicators')
+  async updateAllIndicators(@Param('orgId') orgId: string, @Body() data: any[], @Request() req) {
+    return this.planningService.updateAllIndicators(orgId, req.user.userId, data);
+  }
+
   @Put('indicators/:indicatorId')
   async updateIndicator(
     @Param('orgId') orgId: string,
@@ -101,6 +111,11 @@ export class StrategicPlanningController {
   @Get('action-plan')
   async getActionPlan(@Param('orgId') orgId: string, @Request() req) {
     return this.planningService.getActionPlan(orgId, req.user.userId);
+  }
+
+  @Put('action-plan')
+  async updateAllActions(@Param('orgId') orgId: string, @Body() data: any[], @Request() req) {
+    return this.planningService.updateAllActions(orgId, req.user.userId, data);
   }
 
   @Put('action-plan/:actionId')
