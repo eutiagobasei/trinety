@@ -38,7 +38,7 @@ services:
       - JWT_EXPIRES_IN=7d
       - JWT_REFRESH_EXPIRES_IN=30d
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - FRONTEND_URL=http://dev.trinety.com.br
+      - FRONTEND_URL=https://trinety-dev.lytos.io
       - THROTTLE_TTL=60
       - THROTTLE_LIMIT=100
     ports:
@@ -51,7 +51,7 @@ services:
       context: .
       dockerfile: Dockerfile.frontend.prod
       args:
-        - VITE_API_URL=http://dev.trinety.com.br:5060/api
+        - VITE_API_URL=https://trinety-dev.lytos.io/api
     container_name: trinety-dev-web
     restart: unless-stopped
     depends_on:
