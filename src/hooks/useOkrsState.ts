@@ -29,14 +29,17 @@ export const useOkrsState = () => {
 
     const loadOkrs = async () => {
       try {
-        const data = await apiClient.get<OkrsState>(
+        const data = await apiClient.get<OkrsState[]>(
           `/organizations/${organization.id}/strategic-planning/okrs`
         );
 
-        setOkrs({
-          objetivo: data.objetivo || "",
-          krs: data.krs || "",
-        });
+        // Backend returns array, we use first item or empty
+        if (data && data.length > 0) {
+          setOkrs({
+            objetivo: data[0].objetivo || "",
+            krs: data[0].krs || "",
+          });
+        }
       } catch (error) {
         console.error("Error loading OKRs:", error);
         toast({
@@ -59,9 +62,10 @@ export const useOkrsState = () => {
       try {
         setIsSaving(true);
 
+        // Backend expects array, send single item as array
         await apiClient.put(
           `/organizations/${organization.id}/strategic-planning/okrs`,
-          newOkrs
+          [newOkrs]
         );
       } catch (error) {
         console.error("Error saving OKRs:", error);

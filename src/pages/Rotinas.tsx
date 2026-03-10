@@ -1,118 +1,42 @@
-import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import { useRotinasState } from "@/hooks/useRotinasState";
-import trinityLogo from "@/assets/trinity-logo.png";
+import { PageContainer } from "@/components/layout";
 
 export default function Rotinas() {
-  const navigate = useNavigate();
-  const { rotinas, updateField, loading, saving } = useRotinasState();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Carregando...</p>
-      </div>
-    );
-  }
+  const { rotinas, updateRotina, isLoading, isSaving } = useRotinasState();
 
   return (
-    <div className="min-h-screen bg-background p-10">
-      <div className="mb-8 flex items-center justify-between">
-        <img src={trinityLogo} alt="Trinity Hub" className="h-12" />
-        <Button
-          onClick={() => navigate("/dashboard")}
-          variant="outline"
-          size="sm"
-        >
-          ← Dashboard
-        </Button>
+    <PageContainer
+      title="Rotinas de Gestão"
+      description="Defina a cadência e os rituais para sustentar o planejamento estratégico."
+      isLoading={isLoading}
+      isSaving={isSaving}
+      prevRoute="/plano-de-acao"
+    >
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card className="p-5">
+          <Label className="text-base font-semibold mb-2 block">Rotina Diária</Label>
+          <Textarea className="min-h-[120px] resize-y" placeholder="- Check-in matinal&#10;- Revisão de tarefas" value={rotinas.diaria} onChange={(e) => updateRotina("diaria", e.target.value)} />
+        </Card>
+        <Card className="p-5">
+          <Label className="text-base font-semibold mb-2 block">Rotina Semanal</Label>
+          <Textarea className="min-h-[120px] resize-y" placeholder="- Reunião de equipe&#10;- Review de indicadores" value={rotinas.semanal} onChange={(e) => updateRotina("semanal", e.target.value)} />
+        </Card>
+        <Card className="p-5">
+          <Label className="text-base font-semibold mb-2 block">Rotina Mensal</Label>
+          <Textarea className="min-h-[120px] resize-y" placeholder="- Fechamento de mês&#10;- Análise de KPIs" value={rotinas.mensal} onChange={(e) => updateRotina("mensal", e.target.value)} />
+        </Card>
+        <Card className="p-5">
+          <Label className="text-base font-semibold mb-2 block">Rotina Trimestral</Label>
+          <Textarea className="min-h-[120px] resize-y" placeholder="- Revisão de OKRs&#10;- Planejamento" value={rotinas.trimestral} onChange={(e) => updateRotina("trimestral", e.target.value)} />
+        </Card>
+        <Card className="p-5">
+          <Label className="text-base font-semibold mb-2 block">Rotina Anual</Label>
+          <Textarea className="min-h-[120px] resize-y" placeholder="- Planejamento estratégico&#10;- Retrospectiva" value={rotinas.anual} onChange={(e) => updateRotina("anual", e.target.value)} />
+        </Card>
       </div>
-
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            Rotinas de Gestão
-          </h1>
-          <p className="text-muted-foreground">
-            Defina a cadência de acompanhamento para garantir a execução do plano.
-            Use tópicos (um por linha).
-          </p>
-        </div>
-        {saving && (
-          <span className="text-sm text-muted-foreground">Salvando...</span>
-        )}
-      </div>
-
-      <Card className="p-6 mb-8">
-        <Label htmlFor="semanal" className="text-lg font-semibold mb-2 block">
-          Rotina Semanal
-        </Label>
-        <Textarea
-          id="semanal"
-          className="h-40"
-          placeholder="- Revisão dos KPIs&#10;- Acompanhamento de tarefas"
-          value={rotinas.semanal}
-          onChange={(e) => updateField("semanal", e.target.value)}
-        />
-      </Card>
-
-      <Card className="p-6 mb-8">
-        <Label htmlFor="mensal" className="text-lg font-semibold mb-2 block">
-          Rotina Mensal
-        </Label>
-        <Textarea
-          id="mensal"
-          className="h-40"
-          placeholder="- Fechamento do mês&#10;- Ajuste dos OKRs"
-          value={rotinas.mensal}
-          onChange={(e) => updateField("mensal", e.target.value)}
-        />
-      </Card>
-
-      <Card className="p-6 mb-8">
-        <Label htmlFor="trimestral" className="text-lg font-semibold mb-2 block">
-          Rotina Trimestral
-        </Label>
-        <Textarea
-          id="trimestral"
-          className="h-40"
-          placeholder="- Revisão estratégica"
-          value={rotinas.trimestral}
-          onChange={(e) => updateField("trimestral", e.target.value)}
-        />
-      </Card>
-
-      <Card className="p-6 mb-8">
-        <Label htmlFor="anual" className="text-lg font-semibold mb-2 block">
-          Rotina Anual
-        </Label>
-        <Textarea
-          id="anual"
-          className="h-40"
-          placeholder="- Revisão completa do planejamento"
-          value={rotinas.anual}
-          onChange={(e) => updateField("anual", e.target.value)}
-        />
-      </Card>
-
-      <div className="flex justify-between">
-        <Button
-          onClick={() => navigate("/plano-de-acao")}
-          variant="outline"
-        >
-          Voltar
-        </Button>
-
-        <Button
-          onClick={() => navigate("/dashboard")}
-          variant="default"
-        >
-          Finalizar
-        </Button>
-      </div>
-    </div>
+    </PageContainer>
   );
 }

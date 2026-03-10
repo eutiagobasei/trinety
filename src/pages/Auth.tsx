@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
+import { getPasswordStrength } from "@/lib/validation";
 import trinityLogo from "@/assets/trinity-logo.png";
 
 export default function Auth() {
@@ -18,6 +19,8 @@ export default function Auth() {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupName, setSignupName] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const { signIn, signUp, user, organization } = useAuth();
   const navigate = useNavigate();
@@ -26,7 +29,10 @@ export default function Auth() {
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/dashboard";
 
-  // Redirect if already logged in
+  const passwordStrength = useMemo(() => {
+    return getPasswordStrength(signupPassword);
+  }, [signupPassword]);
+
   useEffect(() => {
     if (user) {
       if (!organization) {
@@ -41,6 +47,27 @@ export default function Auth() {
     return null;
   }
 
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePassword = (password: string): string | null => {
+    if (password.length < 8) {
+      return "Senha deve ter pelo menos 8 caracteres";
+    }
+    if (!/[A-Z]/.test(password)) {
+      return "Senha deve conter pelo menos uma letra maiúscula";
+    }
+    if (!/[a-z]/.test(password)) {
+      return "Senha deve conter pelo menos uma letra minúscula";
+    }
+    if (!/[0-9]/.test(password)) {
+      return "Senha deve conter pelo menos um número";
+    }
+    return null;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -53,14 +80,23 @@ export default function Auth() {
       return;
     }
 
+    if (!validateEmail(loginEmail)) {
+      toast({
+        title: "Email inválido",
+        description: "Por favor, insira um email válido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
-    const { error } = await signIn(loginEmail, loginPassword);
+    const { error } = await signIn(loginEmail.toLowerCase().trim(), loginPassword);
     setIsLoading(false);
 
     if (error) {
       toast({
         title: "Erro ao entrar",
-        description: error.message === "Invalid login credentials"
+        description: error.message === "Invalid login credentials" || error.message === "Credenciais inválidas"
           ? "Email ou senha incorretos."
           : error.message,
         variant: "destructive",
@@ -81,6 +117,34 @@ export default function Auth() {
       return;
     }
 
+    if (signupName.trim().length < 2) {
+      toast({
+        title: "Nome inválido",
+        description: "O nome deve ter pelo menos 2 caracteres.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!validateEmail(signupEmail)) {
+      toast({
+        title: "Email inválido",
+        description: "Por favor, insira um email válido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const passwordError = validatePassword(signupPassword);
+    if (passwordError) {
+      toast({
+        title: "Senha fraca",
+        description: passwordError,
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (signupPassword !== signupConfirmPassword) {
       toast({
         title: "Senhas não conferem",
@@ -90,17 +154,12 @@ export default function Auth() {
       return;
     }
 
-    if (signupPassword.length < 6) {
-      toast({
-        title: "Senha fraca",
-        description: "A senha deve ter pelo menos 6 caracteres.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsLoading(true);
-    const { error } = await signUp(signupEmail, signupPassword, signupName);
+    const { error } = await signUp(
+      signupEmail.toLowerCase().trim(),
+      signupPassword,
+      signupName.trim()
+    );
     setIsLoading(false);
 
     if (error) {
@@ -158,18 +217,36 @@ export default function Auth() {
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     disabled={isLoading}
+                    autoComplete="email"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="login-password">Senha</Label>
-                  <Input
-                    id="login-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    disabled={isLoading}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="login-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      disabled={isLoading}
+                      autoComplete="current-password"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
@@ -195,6 +272,7 @@ export default function Auth() {
                     value={signupName}
                     onChange={(e) => setSignupName(e.target.value)}
                     disabled={isLoading}
+                    autoComplete="name"
                   />
                 </div>
                 <div className="space-y-2">
@@ -206,29 +284,96 @@ export default function Auth() {
                     value={signupEmail}
                     onChange={(e) => setSignupEmail(e.target.value)}
                     disabled={isLoading}
+                    autoComplete="email"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Senha</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={signupPassword}
-                    onChange={(e) => setSignupPassword(e.target.value)}
-                    disabled={isLoading}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="signup-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={signupPassword}
+                      onChange={(e) => setSignupPassword(e.target.value)}
+                      disabled={isLoading}
+                      autoComplete="new-password"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
+                  {signupPassword && (
+                    <div className="mt-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${passwordStrength.color} transition-all duration-300`}
+                            style={{ width: `${(passwordStrength.score / 6) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {passwordStrength.label}
+                        </span>
+                      </div>
+                      <ul className="mt-2 text-xs text-muted-foreground space-y-1">
+                        <li className={signupPassword.length >= 8 ? "text-green-600" : ""}>
+                          {signupPassword.length >= 8 ? "✓" : "○"} Mínimo 8 caracteres
+                        </li>
+                        <li className={/[A-Z]/.test(signupPassword) ? "text-green-600" : ""}>
+                          {/[A-Z]/.test(signupPassword) ? "✓" : "○"} Uma letra maiúscula
+                        </li>
+                        <li className={/[a-z]/.test(signupPassword) ? "text-green-600" : ""}>
+                          {/[a-z]/.test(signupPassword) ? "✓" : "○"} Uma letra minúscula
+                        </li>
+                        <li className={/[0-9]/.test(signupPassword) ? "text-green-600" : ""}>
+                          {/[0-9]/.test(signupPassword) ? "✓" : "○"} Um número
+                        </li>
+                      </ul>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-confirm">Confirmar senha</Label>
-                  <Input
-                    id="signup-confirm"
-                    type="password"
-                    placeholder="••••••••"
-                    value={signupConfirmPassword}
-                    onChange={(e) => setSignupConfirmPassword(e.target.value)}
-                    disabled={isLoading}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="signup-confirm"
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={signupConfirmPassword}
+                      onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                      disabled={isLoading}
+                      autoComplete="new-password"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      tabIndex={-1}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
+                  {signupConfirmPassword && signupPassword !== signupConfirmPassword && (
+                    <p className="text-xs text-destructive">As senhas não coincidem</p>
+                  )}
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (

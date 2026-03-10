@@ -6,13 +6,19 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
+import { AppLayout } from "@/components/layout";
+
+// Public pages
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import EscolherPlano from "./pages/EscolherPlano";
 import CriarEmpresa from "./pages/CriarEmpresa";
 import Convite from "./pages/Convite";
-import Diagnostico from "./pages/Diagnostico";
+import NotFound from "./pages/NotFound";
+
+// Protected pages (inside AppLayout)
 import Dashboard from "./pages/Dashboard";
+import Diagnostico from "./pages/Diagnostico";
 import ModeloDeNegocio from "./pages/ModeloDeNegocio";
 import MapaDeEmpatia from "./pages/MapaDeEmpatia";
 import Filosofia from "./pages/Filosofia";
@@ -22,7 +28,6 @@ import Indicadores from "./pages/Indicadores";
 import PlanoDeAcao from "./pages/PlanoDeAcao";
 import Rotinas from "./pages/Rotinas";
 import Admin from "./pages/Admin";
-import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -34,100 +39,45 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            {/* Public routes - no layout */}
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/escolher-plano" element={<EscolherPlano />} />
             <Route path="/criar-empresa" element={<CriarEmpresa />} />
             <Route path="/convite/:token" element={<Convite />} />
+
+            {/* Protected routes - with AppLayout */}
             <Route
-              path="/diagnostico"
               element={
                 <ProtectedRoute>
-                  <Diagnostico />
+                  <AppLayout />
                 </ProtectedRoute>
               }
-            />
+            >
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/diagnostico" element={<Diagnostico />} />
+              <Route path="/modelo-de-negocio" element={<ModeloDeNegocio />} />
+              <Route path="/mapa-de-empatia" element={<MapaDeEmpatia />} />
+              <Route path="/filosofia" element={<Filosofia />} />
+              <Route path="/swot" element={<Swot />} />
+              <Route path="/okrs" element={<Okrs />} />
+              <Route path="/indicadores" element={<Indicadores />} />
+              <Route path="/plano-de-acao" element={<PlanoDeAcao />} />
+              <Route path="/rotinas" element={<Rotinas />} />
+            </Route>
+
+            {/* Admin routes - with AppLayout */}
             <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/modelo-de-negocio"
-              element={
-                <ProtectedRoute>
-                  <ModeloDeNegocio />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/mapa-de-empatia"
-              element={
-                <ProtectedRoute>
-                  <MapaDeEmpatia />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/filosofia"
-              element={
-                <ProtectedRoute>
-                  <Filosofia />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/swot"
-              element={
-                <ProtectedRoute>
-                  <Swot />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/okrs"
-              element={
-                <ProtectedRoute>
-                  <Okrs />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/indicadores"
-              element={
-                <ProtectedRoute>
-                  <Indicadores />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/plano-de-acao"
-              element={
-                <ProtectedRoute>
-                  <PlanoDeAcao />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/rotinas"
-              element={
-                <ProtectedRoute>
-                  <Rotinas />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin"
               element={
                 <AdminRoute>
-                  <Admin />
+                  <AppLayout />
                 </AdminRoute>
               }
-            />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            >
+              <Route path="/admin" element={<Admin />} />
+            </Route>
+
+            {/* Catch-all 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

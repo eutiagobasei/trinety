@@ -5,10 +5,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: trinety
-      POSTGRES_PASSWORD: trinety
+      POSTGRES_PASSWORD: trinety123
       POSTGRES_DB: trinety
     ports:
-      - "5440:5432"
+      - "5450:5432"
     volumes:
       - trinety_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -34,14 +34,17 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USERNAME=trinety
-      - DB_PASSWORD=trinety
+      - DB_PASSWORD=trinety123
       - DB_DATABASE=trinety
-      - JWT_SECRET=trinety-super-secret-jwt-key-2024
+      - JWT_SECRET=trinety-dev-jwt-secret-key-2024-local
       - JWT_EXPIRES_IN=7d
+      - JWT_REFRESH_EXPIRES_IN=30d
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - FRONTEND_URL=http://localhost:5180
+      - FRONTEND_URL=http://localhost:8082
+      - THROTTLE_TTL=60
+      - THROTTLE_LIMIT=100
     ports:
-      - "3050:3000"
+      - "3060:3000"
     volumes:
       - ./backend/src:/app/src:delegated
     networks:
@@ -56,12 +59,13 @@ services:
     depends_on:
       - backend
     environment:
-      - VITE_API_URL=http://localhost:3050/api
+      - VITE_API_URL=http://localhost:3060/api
     ports:
-      - "5180:8080"
+      - "5190:8080"
     volumes:
       - ./src:/app/src:delegated
       - ./public:/app/public:delegated
+      - /app/node_modules
     networks:
       - trinety-network
 
