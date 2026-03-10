@@ -14,8 +14,8 @@ jobs:
           host: ${{ secrets.VPS_HOST_DEV }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          timeout: 60s
-          command_timeout: 20m
+          timeout: 120s
+          command_timeout: 30m
           script: |
             set -e
             echo "=== Deploying Trinety to DEV ==="
