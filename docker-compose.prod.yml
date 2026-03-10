@@ -1,0 +1,69 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: trinety-prod-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trinety
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-trinety_prod_2024}
+      POSTGRES_DB: trinety
+    volumes:
+      - trinety_prod_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trinety"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - trinety-prod-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: trinety-prod-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=trinety
+      - DB_PASSWORD=${DB_PASSWORD:-trinety_prod_2024}
+      - DB_DATABASE=trinety
+      - JWT_SECRET=${JWT_SECRET:-trinety-prod-jwt-secret-key-2024}
+      - JWT_EXPIRES_IN=7d
+      - JWT_REFRESH_EXPIRES_IN=30d
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - FRONTEND_URL=${FRONTEND_URL:-http://trinety.com.br}
+      - THROTTLE_TTL=60
+      - THROTTLE_LIMIT=100
+    ports:
+      - "5061:3000"
+    networks:
+      - trinety-prod-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend.prod
+      args:
+        - VITE_API_URL=${FRONTEND_URL:-http://trinety.com.br}:5061/api
+    container_name: trinety-prod-web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5081:80"
+    networks:
+      - trinety-prod-network
+
+volumes:
+  trinety_prod_postgres_data:
+
+networks:
+  trinety-prod-network:
+    driver: bridge
