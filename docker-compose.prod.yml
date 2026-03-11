@@ -1,4 +1,20 @@
 services:
+  traefik:
+    image: traefik:v3.0
+    container_name: trinety-prod-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.prod.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/acme.json:/letsencrypt/acme.json
+    environment:
+      - ACME_EMAIL=${ACME_EMAIL:-admin@lytos.io}
+    networks:
+      - trinety-prod-network
+
   postgres:
     image: postgres:16-alpine
     container_name: trinety-prod-db
@@ -38,28 +54,36 @@ services:
       - JWT_EXPIRES_IN=7d
       - JWT_REFRESH_EXPIRES_IN=30d
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - FRONTEND_URL=${FRONTEND_URL:-http://trinety.com.br}
+      - FRONTEND_URL=${FRONTEND_URL:-https://trinety.com.br}
       - THROTTLE_TTL=60
       - THROTTLE_LIMIT=100
-    ports:
-      - "5061:3000"
     networks:
       - trinety-prod-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN:-trinety.com.br}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.backend.loadbalancer.server.port=3000"
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend.prod
       args:
-        - VITE_API_URL=${FRONTEND_URL:-http://trinety.com.br}:5061/api
+        - VITE_API_URL=${FRONTEND_URL:-https://trinety.com.br}/api
     container_name: trinety-prod-web
     restart: unless-stopped
     depends_on:
       - backend
-    ports:
-      - "5081:80"
     networks:
       - trinety-prod-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN:-trinety.com.br}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
 
 volumes:
   trinety_prod_postgres_data:

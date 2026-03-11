@@ -1,4 +1,26 @@
 services:
+  traefik:
+    image: traefik:v3.0
+    container_name: trinety-dev-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/acme.json:/letsencrypt/acme.json
+    environment:
+      - ACME_EMAIL=${ACME_EMAIL:-admin@lytos.io}
+    networks:
+      - trinety-dev-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.trinety-dev.lytos.io`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
+
   postgres:
     image: postgres:16-alpine
     container_name: trinety-dev-db
@@ -41,10 +63,14 @@ services:
       - FRONTEND_URL=https://trinety-dev.lytos.io
       - THROTTLE_TTL=60
       - THROTTLE_LIMIT=100
-    ports:
-      - "5060:3000"
     networks:
       - trinety-dev-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`trinety-dev.lytos.io`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.backend.loadbalancer.server.port=3000"
 
   frontend:
     build:
@@ -56,10 +82,14 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    ports:
-      - "5080:80"
     networks:
       - trinety-dev-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`trinety-dev.lytos.io`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
 
 volumes:
   trinety_dev_postgres_data:

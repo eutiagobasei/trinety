@@ -25,6 +25,11 @@ jobs:
             git checkout main
             git pull origin main
 
+            # Ensure acme.json exists with correct permissions
+            mkdir -p traefik
+            touch traefik/acme.json
+            chmod 600 traefik/acme.json
+
             echo "=== Rebuilding containers ==="
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d --build
